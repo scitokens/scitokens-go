@@ -40,9 +40,5 @@ func (e *Enforcer) ValidateTokenString(tokenstring string) error {
 }
 
 func (e *Enforcer) validate(t jwt.Token) error {
-	err := jwt.Validate(t, jwt.WithIssuer(e.Issuer))
-	if err != nil {
-		return fmt.Errorf("failed to validate token: %s", err)
-	}
-	return nil
+	return jwt.Validate(t, jwt.WithIssuer(e.Issuer))
 }

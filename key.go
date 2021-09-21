@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"path"
 
 	"github.com/lestrrat-go/jwx/jwk"
@@ -44,7 +43,7 @@ func FetchMetadata(ctx context.Context, urlstring string) (*AuthServerMetadata, 
 
 	var rr io.Reader = r.Body
 	// DEBUG
-	rr = io.TeeReader(r.Body, os.Stderr)
+	//rr = io.TeeReader(r.Body, os.Stderr)
 
 	var meta AuthServerMetadata
 	dec := json.NewDecoder(rr)

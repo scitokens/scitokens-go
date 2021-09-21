@@ -11,5 +11,5 @@ func printToken(t jwt.Token) {
 	fmt.Printf("Issuer: %s\n", t.Issuer())
 	fmt.Printf("Audience: %s\n", t.Audience())
 	fmt.Printf("Issued at: %s, Expires at: %s\n", t.IssuedAt(), t.Expiration())
-	fmt.Printf("Claims: %v", t.PrivateClaims())
+	fmt.Printf("Claims: %v\n", t.PrivateClaims())
 }
