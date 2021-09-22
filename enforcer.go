@@ -3,6 +3,7 @@ package scitokens
 import (
 	"context"
 	"fmt"
+	"io"
 
 	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/lestrrat-go/jwx/jwt"
@@ -34,6 +35,17 @@ func (e *Enforcer) ValidateTokenString(tokenstring string) error {
 	t, err := jwt.ParseString(tokenstring, jwt.WithKeySet(e.keys))
 	if err != nil {
 		return fmt.Errorf("failed to parse token from string: %s", err)
+	}
+	printToken(t)
+	return e.validate(t)
+}
+
+// ValidateTokenReader validates that the SciToken read from the provided
+// io.Reader is valid and meets all constraints imposed by the Enforcer.
+func (e *Enforcer) ValidateTokenReader(r io.Reader) error {
+	t, err := jwt.ParseReader(r, jwt.WithKeySet(e.keys))
+	if err != nil {
+		return fmt.Errorf("failed to parse token: %s", err)
 	}
 	printToken(t)
 	return e.validate(t)
