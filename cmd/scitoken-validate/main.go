@@ -5,7 +5,6 @@ import (
 	"io"
 	"log"
 	"os"
-	"strings"
 
 	scitokens "github.com/retzkek/scitokens-go"
 	flag "github.com/spf13/pflag"
@@ -61,8 +60,7 @@ func main() {
 		enf.SetLogger(os.Stderr)
 	}
 	for _, s := range *scopes {
-		pts := strings.SplitN(s, ":", 2)
-		if err = enf.RequireScope(pts[0], pts[1:]...); err != nil {
+		if err = enf.RequireScope(scitokens.ParseScope(s)); err != nil {
 			log.Fatalf("unable to require scope %s: %s", s, err)
 		}
 	}

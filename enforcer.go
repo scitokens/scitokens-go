@@ -72,15 +72,9 @@ func (e *Enforcer) SetLogger(w io.Writer) {
 	e.logger = w
 }
 
-// RequireScope adds authz to optional path(s) to scopes to validate.
-func (e *Enforcer) RequireScope(authz string, paths ...string) error {
-	if len(paths) == 0 {
-		e.scopes = append(e.scopes, Scope{authz, ""})
-	} else {
-		for _, p := range paths {
-			e.scopes = append(e.scopes, Scope{authz, p})
-		}
-	}
+// RequireScope adds s to scopes to validate.
+func (e *Enforcer) RequireScope(s Scope) error {
+	e.scopes = append(e.scopes, s)
 	return nil
 }
 
