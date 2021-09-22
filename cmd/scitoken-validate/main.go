@@ -32,7 +32,7 @@ The token issuer must be specified with the --issuer/-i flag. Optionally pass on
 or more scopes to validate with the --scope/-s flag.
 
 If the token is not valid an explanation message will be printed to stderr and
-the program will terminate with exit code -1.
+the program will terminate with exit code 1.
 
 EXAMPLES
 
@@ -55,7 +55,7 @@ FLAGS
 func main() {
 	enf, err := scitokens.NewEnforcer(*issuer)
 	if err != nil {
-		log.Fatalf("failed to initialize enforcer: %s\n", err)
+		log.Fatalf("failed to initialize enforcer: %s", err)
 	}
 	if *verbose {
 		enf.SetLogger(os.Stderr)
@@ -63,7 +63,7 @@ func main() {
 	for _, s := range *scopes {
 		pts := strings.SplitN(s, ":", 2)
 		if err = enf.RequireScope(pts[0], pts[1:]...); err != nil {
-			log.Fatalf("unable to require scope %s: %s\n", s, err)
+			log.Fatalf("unable to require scope %s: %s", s, err)
 		}
 	}
 
@@ -87,8 +87,9 @@ func main() {
 		log.Printf("reading token from stdin")
 		t = os.Stdin
 	}
+	// TODO support validating multiple tokens
 	err = enf.ValidateTokenReader(t)
 	if err != nil {
-		log.Fatalf("token not valid: %s\n", err)
+		log.Fatalf("token not valid: %s", err)
 	}
 }
