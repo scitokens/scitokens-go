@@ -10,12 +10,39 @@ import (
 	"github.com/lestrrat-go/jwx/jwt"
 )
 
+type Scope struct {
+	Auth string
+	Path string
+}
+
+func ParseScope(s string) Scope {
+	pts := strings.SplitN(s, ":", 2)
+	if len(pts) == 1 {
+		return Scope{pts[0], ""}
+	}
+	return Scope{pts[0], pts[1]}
+}
+
+func NewScope(authz string, paths ...string) Scope {
+	if len(paths) == 0 {
+		return Scope{authz, ""}
+	}
+	return Scope{authz, paths[0]}
+}
+
+func (s Scope) String() string {
+	if s.Path != "" {
+		return s.Auth + ":" + s.Path
+	}
+	return s.Auth
+}
+
 // Enforcer verifies that SciTokens https://scitokens.org are valid, from a
 // certain issuer, and that they allow the requested resource.
 type Enforcer struct {
 	Issuer string
 	keys   jwk.Set
-	scopes []string
+	scopes []Scope
 	logger io.Writer
 }
 
@@ -29,7 +56,7 @@ func NewEnforcer(issuer string) (*Enforcer, error) {
 	return &Enforcer{
 		Issuer: issuer,
 		keys:   keys,
-		scopes: make([]string, 0),
+		scopes: make([]Scope, 0),
 	}, nil
 }
 
@@ -41,10 +68,10 @@ func (e *Enforcer) SetLogger(w io.Writer) {
 // RequireScope adds authz to optional path(s) to scopes to validate.
 func (e *Enforcer) RequireScope(authz string, paths ...string) error {
 	if len(paths) == 0 {
-		e.scopes = append(e.scopes, authz)
+		e.scopes = append(e.scopes, Scope{authz, ""})
 	} else {
 		for _, p := range paths {
-			e.scopes = append(e.scopes, authz+":"+p)
+			e.scopes = append(e.scopes, Scope{authz, p})
 		}
 	}
 	return nil
@@ -103,15 +130,19 @@ func (e *Enforcer) validate(t jwt.Token) error {
 		return fmt.Errorf("unable to cast scopes claim to string")
 	}
 	scopes := strings.Split(scopestr, " ")
-	scopemap := make(map[string]bool, len(scopes))
+	hasScopes := make([]Scope, len(scopes))
 	for _, s := range scopes {
-		scopemap[s] = true
+		hasScopes = append(hasScopes, ParseScope(s))
 	}
 	missingScopes := make([]string, 0)
+OUTER:
 	for _, s := range e.scopes {
-		if _, ok := scopemap[s]; !ok {
-			missingScopes = append(missingScopes, s)
+		for _, ss := range hasScopes {
+			if s.Auth == ss.Auth && strings.HasPrefix(s.Path, ss.Path) {
+				continue OUTER
+			}
 		}
+		missingScopes = append(missingScopes, s.String())
 	}
 	if len(missingScopes) > 0 {
 		return fmt.Errorf("missing the following scopes: %s", strings.Join(missingScopes, ","))
