@@ -10,11 +10,13 @@ import (
 	"github.com/lestrrat-go/jwx/jwt"
 )
 
+// Scope represents a token authorization scope, with optional path.
 type Scope struct {
 	Auth string
 	Path string
 }
 
+// ParseScope parses a scope string like AUTHZ[:PATH].
 func ParseScope(s string) Scope {
 	pts := strings.SplitN(s, ":", 2)
 	if len(pts) == 1 {
@@ -23,13 +25,7 @@ func ParseScope(s string) Scope {
 	return Scope{pts[0], pts[1]}
 }
 
-func NewScope(authz string, paths ...string) Scope {
-	if len(paths) == 0 {
-		return Scope{authz, ""}
-	}
-	return Scope{authz, paths[0]}
-}
-
+// String returns the string representation of the scope.
 func (s Scope) String() string {
 	if s.Path != "" {
 		return s.Auth + ":" + s.Path
@@ -37,8 +33,19 @@ func (s Scope) String() string {
 	return s.Auth
 }
 
+// Allowed returns true if operation on path (can be empty string) is allowed by
+// this scope. If path is a sub-path under the scope's path then it is allowed,
+// e.g. if the scope path is write:/baz then operation=write and path=/baz/qux
+// is allowed.
+func (s Scope) Allowed(operation string, path string) bool {
+	return s.Auth == operation && strings.HasPrefix(path, s.Path)
+}
+
 // Enforcer verifies that SciTokens https://scitokens.org are valid, from a
 // certain issuer, and that they allow the requested resource.
+//
+// TODO: obtain issuer from token and provide the enforcer with a list of
+// allowed issuers.
 type Enforcer struct {
 	Issuer string
 	keys   jwk.Set
@@ -138,7 +145,7 @@ func (e *Enforcer) validate(t jwt.Token) error {
 OUTER:
 	for _, s := range e.scopes {
 		for _, ss := range hasScopes {
-			if s.Auth == ss.Auth && strings.HasPrefix(s.Path, ss.Path) {
+			if ss.Allowed(s.Auth, s.Path) {
 				continue OUTER
 			}
 		}
