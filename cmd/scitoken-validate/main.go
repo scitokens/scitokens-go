@@ -11,12 +11,12 @@ import (
 )
 
 var (
-	issuer *string = flag.StringP("issuer", "i", "https://cilogon.org/fermilab",
-		"token issuer, used for obtaining keys and validating token")
+	issuers *[]string = flag.StringSliceP("issuer", "i", []string{},
+		"trusted token issuer for obtaining keys and validating token. Can be repeated.")
 	scopes *[]string = flag.StringSliceP("scope", "s", []string{},
-		"scope to validate, with optional path delimited by colon. Can be repeated")
+		"scope to validate, with optional path delimited by colon. Can be repeated.")
 	verbose *bool = flag.BoolP("verbose", "v", false,
-		"extra logging of token information and internals to stderr")
+		"extra logging of token information and internals to stderr.")
 )
 
 func init() {
@@ -27,8 +27,11 @@ The SciToken will be read from a file pointed to by the SCITOKEN environment
 variable, or if undefined from a file named like /tmp/scitoken_u$UID, otherwise
 read from stdin. Currently only one token is expected to be in the file.
 
-The token issuer must be specified with the --issuer/-i flag. Optionally pass one
-or more scopes to validate with the --scope/-s flag.
+At least one token issuer must be specified with the --issuer/-i flag, which can
+be repeated. Signing keys will be fetched for each issuer to validate the tokens
+signature, and it will also be validated that the token was issued by one of them.
+
+Optionally pass one or more scopes to validate with the --scope/-s flag.
 
 If the token is not valid an explanation message will be printed to stderr and
 the program will terminate with exit code 1.
@@ -52,7 +55,7 @@ FLAGS
 }
 
 func main() {
-	enf, err := scitokens.NewEnforcer(*issuer)
+	enf, err := scitokens.NewEnforcer(*issuers...)
 	if err != nil {
 		log.Fatalf("failed to initialize enforcer: %s", err)
 	}
