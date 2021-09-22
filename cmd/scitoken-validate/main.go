@@ -21,6 +21,34 @@ var (
 )
 
 func init() {
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "%s: Basic SciToken validator.\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, `
+The SciToken will be read from a file pointed to by the SCITOKEN environment
+variable, or if undefined from a file named like /tmp/scitoken_u$UID, otherwise
+read from stdin. Currently only one token is expected to be in the file.
+
+The token issuer must be specified with the --issuer/-i flag. Optionally pass one
+or more scopes to validate with the --scope/-s flag.
+
+If the token is not valid an explanation message will be printed to stderr and
+the program will terminate with exit code -1.
+
+EXAMPLES
+
+Basic validation:
+    scitoken-validate -i https://cilogon.org/fermilab
+
+Enforce scopes:
+    scitoken-validate -i https://cilogon.org/fermilab -s compute.create -s storage.read:/fermilab/users/kretzke/foo
+
+(Note that scope paths will validate sub-paths, e.g. this will validate a
+token that has storage.read:/fermilab/users/kretzke)
+
+FLAGS
+`)
+		flag.PrintDefaults()
+	}
 	flag.Parse()
 }
 
