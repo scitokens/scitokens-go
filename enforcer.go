@@ -43,28 +43,54 @@ func (s Scope) Allowed(operation string, path string) bool {
 
 // Enforcer verifies that SciTokens https://scitokens.org are valid, from a
 // certain issuer, and that they allow the requested resource.
-//
-// TODO: obtain issuer from token and provide the enforcer with a list of
-// allowed issuers.
 type Enforcer struct {
-	Issuer string
-	keys   jwk.Set
-	scopes []Scope
-	logger io.Writer
+	issuers map[string]bool
+	keys    jwk.Set
+	scopes  []Scope
+	logger  io.Writer
 }
 
 // NewEnforcer initializes a new enforcer for validating SciTokens from the
-// provided issuer.
-func NewEnforcer(issuer string) (*Enforcer, error) {
-	keys, err := GetIssuerKeys(context.Background(), issuer)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch keyset: %s", err)
+// provided issuer(s).
+func NewEnforcer(issuers ...string) (*Enforcer, error) {
+	if len(issuers) == 0 {
+		return nil, fmt.Errorf("must accept at least one issuer")
 	}
-	return &Enforcer{
-		Issuer: issuer,
-		keys:   keys,
-		scopes: make([]Scope, 0),
-	}, nil
+	e := Enforcer{
+		issuers: make(map[string]bool),
+		scopes:  make([]Scope, 0),
+	}
+	for _, i := range issuers {
+		if err := e.AddIssuer(context.Background(), i); err != nil {
+			return nil, err
+		}
+	}
+	return &e, nil
+}
+
+// AddIssuer adds an accepted issuer and fetches its signing keys.
+func (e *Enforcer) AddIssuer(ctx context.Context, issuer string) error {
+	keys, err := GetIssuerKeys(ctx, issuer)
+	if err != nil {
+		return fmt.Errorf("failed to fetch keyset for issuer %s: %s", issuer, err)
+	}
+	if e.keys == nil {
+		e.keys = keys
+	} else {
+		// Merge keys into existing KeySet. Ideally we'd maintain multiple
+		// keysets and pick at token parse time, but this is not currently
+		// feasible. See https://github.com/lestrrat-go/jwx/issues/474.
+		iter := keys.Iterate(ctx)
+		for iter.Next(ctx) {
+			k, ok := iter.Pair().Value.(jwk.Key)
+			if !ok {
+				return fmt.Errorf("iterating over keys yielded a non-key")
+			}
+			e.keys.Add(k)
+		}
+	}
+	e.issuers[issuer] = true
+	return nil
 }
 
 // SetLogger sends verbose logging to the provided io.Writer.
@@ -92,7 +118,8 @@ func (e *Enforcer) ValidateTokenString(tokenstring string) error {
 // ValidateTokenReader validates that the SciToken read from the provided
 // io.Reader is valid and meets all constraints imposed by the Enforcer.
 func (e *Enforcer) ValidateTokenReader(r io.Reader) error {
-	t, err := jwt.ParseReader(r, jwt.WithKeySet(e.keys))
+	//t, err := jwt.ParseReader(r, jwt.WithKeySet(e.keys))
+	t, err := jwt.ParseReader(r)
 	if err != nil {
 		return fmt.Errorf("failed to parse token: %s", err)
 	}
@@ -108,8 +135,10 @@ func (e *Enforcer) log(t jwt.Token) {
 
 func (e *Enforcer) validate(t jwt.Token) error {
 	// validate standard claims
+	if _, ok := e.issuers[t.Issuer()]; !ok {
+		return fmt.Errorf("untrusted issuer %s", t.Issuer())
+	}
 	err := jwt.Validate(t,
-		jwt.WithIssuer(e.Issuer),
 		jwt.WithRequiredClaim("scope"),
 	)
 	if err != nil {
