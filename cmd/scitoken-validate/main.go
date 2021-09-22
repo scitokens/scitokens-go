@@ -1,18 +1,23 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"io"
 	"log"
 	"os"
+	"strings"
 
 	scitokens "github.com/retzkek/scitokens-go"
+	flag "github.com/spf13/pflag"
 )
 
 var (
-	issuer *string = flag.String("issuer", "https://cilogon.org/fermilab",
+	issuer *string = flag.StringP("issuer", "i", "https://cilogon.org/fermilab",
 		"token issuer, used for obtaining keys and validating token")
+	scopes *[]string = flag.StringSliceP("scope", "s", []string{},
+		"scope to validate, with optional path delimited by colon. Can be repeated")
+	verbose *bool = flag.BoolP("verbose", "v", false,
+		"extra logging of token information and internals to stderr")
 )
 
 func init() {
@@ -23,6 +28,15 @@ func main() {
 	enf, err := scitokens.NewEnforcer(*issuer)
 	if err != nil {
 		log.Fatalf("failed to initialize enforcer: %s\n", err)
+	}
+	if *verbose {
+		enf.SetLogger(os.Stderr)
+	}
+	for _, s := range *scopes {
+		pts := strings.SplitN(s, ":", 2)
+		if err = enf.RequireScope(pts[0], pts[1:]...); err != nil {
+			log.Fatalf("unable to require scope %s: %s\n", s, err)
+		}
 	}
 
 	filename := os.Getenv("SCITOKEN")
