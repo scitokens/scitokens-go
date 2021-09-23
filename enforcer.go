@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"path"
 	"strings"
 
 	"github.com/lestrrat-go/jwx/jwk"
@@ -48,6 +49,7 @@ type Enforcer struct {
 	issuers map[string]bool
 	keys    jwk.Set
 	scopes  []Scope
+	groups  []string
 	logger  io.Writer
 }
 
@@ -60,6 +62,7 @@ func NewEnforcer(issuers ...string) (*Enforcer, error) {
 	e := Enforcer{
 		issuers: make(map[string]bool),
 		scopes:  make([]Scope, 0),
+		groups:  make([]string, 0),
 	}
 	for _, i := range issuers {
 		if err := e.AddIssuer(context.Background(), i); err != nil {
@@ -105,6 +108,13 @@ func (e *Enforcer) RequireScope(s Scope) error {
 	return nil
 }
 
+// RequireGroup adds group to the WLCG groups to validate. The leading slash is
+// optional.
+func (e *Enforcer) RequireGroup(group string) error {
+	e.groups = append(e.groups, path.Join("/", group))
+	return nil
+}
+
 // ValidateTokenString validates that the SciToken in the provided string is
 // valid and meets all constraints imposed by the Enforcer.
 func (e *Enforcer) ValidateTokenString(tokenstring string) error {
@@ -113,7 +123,7 @@ func (e *Enforcer) ValidateTokenString(tokenstring string) error {
 		return fmt.Errorf("failed to parse token from string: %s", err)
 	}
 	e.log(t)
-	return e.validate(t)
+	return e.Validate(t)
 }
 
 // ValidateTokenReader validates that the SciToken read from the provided
@@ -124,14 +134,16 @@ func (e *Enforcer) ValidateTokenReader(r io.Reader) error {
 		return fmt.Errorf("failed to parse token: %s", err)
 	}
 	e.log(t)
-	return e.validate(t)
+	return e.Validate(t)
 }
 
 // ValidateTokenRequest validates that the SciToken read from the provided
 // http.Request is valid and meets all constraints imposed by the Enforcer.
 // Optionally pass one or more headers in whick to look for the token,
 // default is "Authorization".
-func (e *Enforcer) ValidateTokenRequest(r *http.Request, headers ...string) error {
+//
+// The token is returned and can be re-validated with Validate().
+func (e *Enforcer) ValidateTokenRequest(r *http.Request, headers ...string) (jwt.Token, error) {
 	// get token from request
 	opts := make([]jwt.ParseOption, len(headers)+1)
 	opts = append(opts, jwt.WithKeySet(e.keys))
@@ -140,10 +152,10 @@ func (e *Enforcer) ValidateTokenRequest(r *http.Request, headers ...string) erro
 	}
 	t, err := jwt.ParseRequest(r, opts...)
 	if err != nil {
-		return fmt.Errorf("failed to parse token from request: %s", err)
+		return nil, fmt.Errorf("failed to parse token from request: %s", err)
 	}
 	e.log(t)
-	return e.validate(t)
+	return t, e.Validate(t)
 }
 
 func (e *Enforcer) log(t jwt.Token) {
@@ -152,7 +164,10 @@ func (e *Enforcer) log(t jwt.Token) {
 	}
 }
 
-func (e *Enforcer) validate(t jwt.Token) error {
+// Validate checks that the SciToken is valid and meets all constraints imposed
+// by the Enforcer. This can be called multiple times, e.g. to test the token
+// against different scopes.
+func (e *Enforcer) Validate(t jwt.Token) error {
 	// validate standard claims
 	if _, ok := e.issuers[t.Issuer()]; !ok {
 		return fmt.Errorf("untrusted issuer %s", t.Issuer())
@@ -164,12 +179,22 @@ func (e *Enforcer) validate(t jwt.Token) error {
 		return err
 	}
 
-	// no scopes to validate
-	if len(e.scopes) == 0 {
-		return nil
+	if len(e.scopes) > 0 {
+		if err := e.validateScopes(t); err != nil {
+			return err
+		}
 	}
 
-	// validate scopes
+	if len(e.groups) > 0 {
+		if err := e.validateGroups(t); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (e *Enforcer) validateScopes(t jwt.Token) error {
 	scopeint, ok := t.Get("scope")
 	if !ok {
 		return fmt.Errorf("scope claim missing")
@@ -196,5 +221,42 @@ OUTER:
 	if len(missingScopes) > 0 {
 		return fmt.Errorf("missing the following scopes: %s", strings.Join(missingScopes, ","))
 	}
+
+	return nil
+}
+
+func (e *Enforcer) validateGroups(t jwt.Token) error {
+	groupint, ok := t.Get("wlcg.groups")
+	if !ok {
+		return fmt.Errorf("wlcg.groups claim missing")
+	}
+	groupints, ok := groupint.([]interface{})
+	if !ok {
+		return fmt.Errorf("unable to cast wlcg.groups claim to slice")
+	}
+	groups := make([]string, len(groupints))
+	for _, g := range groupints {
+		gs, ok := g.(string)
+		if !ok {
+			return fmt.Errorf("unable to cast wlcg.group \"%v\" to string", g)
+		}
+		groups = append(groups, gs)
+	}
+	if !ok {
+	}
+	missingGroups := make([]string, 0)
+OUTER:
+	for _, g := range e.groups {
+		for _, gg := range groups {
+			if gg == g {
+				continue OUTER
+			}
+		}
+		missingGroups = append(missingGroups, g)
+	}
+	if len(missingGroups) > 0 {
+		return fmt.Errorf("missing the following groups: %s", strings.Join(missingGroups, ","))
+	}
+
 	return nil
 }
