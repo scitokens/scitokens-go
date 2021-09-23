@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
 	"strings"
 
 	"github.com/lestrrat-go/jwx/jwk"
@@ -118,10 +119,28 @@ func (e *Enforcer) ValidateTokenString(tokenstring string) error {
 // ValidateTokenReader validates that the SciToken read from the provided
 // io.Reader is valid and meets all constraints imposed by the Enforcer.
 func (e *Enforcer) ValidateTokenReader(r io.Reader) error {
-	//t, err := jwt.ParseReader(r, jwt.WithKeySet(e.keys))
-	t, err := jwt.ParseReader(r)
+	t, err := jwt.ParseReader(r, jwt.WithKeySet(e.keys))
 	if err != nil {
 		return fmt.Errorf("failed to parse token: %s", err)
+	}
+	e.log(t)
+	return e.validate(t)
+}
+
+// ValidateTokenRequest validates that the SciToken read from the provided
+// http.Request is valid and meets all constraints imposed by the Enforcer.
+// Optionally pass one or more headers in whick to look for the token,
+// default is "Authorization".
+func (e *Enforcer) ValidateTokenRequest(r *http.Request, headers ...string) error {
+	// get token from request
+	opts := make([]jwt.ParseOption, len(headers)+1)
+	opts = append(opts, jwt.WithKeySet(e.keys))
+	for _, h := range headers {
+		opts = append(opts, jwt.WithHeaderKey(h))
+	}
+	t, err := jwt.ParseRequest(r, opts...)
+	if err != nil {
+		return fmt.Errorf("failed to parse token from request: %s", err)
 	}
 	e.log(t)
 	return e.validate(t)
