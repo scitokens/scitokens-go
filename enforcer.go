@@ -120,7 +120,7 @@ func (e *Enforcer) RequireGroup(group string) error {
 func (e *Enforcer) ValidateTokenString(tokenstring string) error {
 	t, err := jwt.ParseString(tokenstring, jwt.WithKeySet(e.keys))
 	if err != nil {
-		return fmt.Errorf("failed to parse token from string: %s", err)
+		return &TokenParseError{err}
 	}
 	e.log(t)
 	return e.Validate(t)
@@ -131,7 +131,7 @@ func (e *Enforcer) ValidateTokenString(tokenstring string) error {
 func (e *Enforcer) ValidateTokenReader(r io.Reader) error {
 	t, err := jwt.ParseReader(r, jwt.WithKeySet(e.keys))
 	if err != nil {
-		return fmt.Errorf("failed to parse token: %s", err)
+		return &TokenParseError{err}
 	}
 	e.log(t)
 	return e.Validate(t)
@@ -139,20 +139,12 @@ func (e *Enforcer) ValidateTokenReader(r io.Reader) error {
 
 // ValidateTokenRequest validates that the SciToken read from the provided
 // http.Request is valid and meets all constraints imposed by the Enforcer.
-// Optionally pass one or more headers in whick to look for the token,
-// default is "Authorization".
 //
 // The token is returned and can be re-validated with Validate().
-func (e *Enforcer) ValidateTokenRequest(r *http.Request, headers ...string) (jwt.Token, error) {
-	// get token from request
-	opts := make([]jwt.ParseOption, len(headers)+1)
-	opts = append(opts, jwt.WithKeySet(e.keys))
-	for _, h := range headers {
-		opts = append(opts, jwt.WithHeaderKey(h))
-	}
-	t, err := jwt.ParseRequest(r, opts...)
+func (e *Enforcer) ValidateTokenRequest(r *http.Request) (jwt.Token, error) {
+	t, err := jwt.ParseRequest(r, jwt.WithKeySet(e.keys))
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse token from request: %s", err)
+		return nil, &TokenParseError{err}
 	}
 	e.log(t)
 	return t, e.Validate(t)
@@ -170,13 +162,13 @@ func (e *Enforcer) log(t jwt.Token) {
 func (e *Enforcer) Validate(t jwt.Token) error {
 	// validate standard claims
 	if _, ok := e.issuers[t.Issuer()]; !ok {
-		return fmt.Errorf("untrusted issuer %s", t.Issuer())
+		return &TokenValidationError{fmt.Errorf("untrusted issuer %s", t.Issuer())}
 	}
 	err := jwt.Validate(t,
 		jwt.WithRequiredClaim("scope"),
 	)
 	if err != nil {
-		return err
+		return &TokenValidationError{err}
 	}
 
 	if len(e.scopes) > 0 {
@@ -197,7 +189,7 @@ func (e *Enforcer) Validate(t jwt.Token) error {
 func (e *Enforcer) validateScopes(t jwt.Token) error {
 	scopeint, ok := t.Get("scope")
 	if !ok {
-		return fmt.Errorf("scope claim missing")
+		return &TokenValidationError{fmt.Errorf("scope claim missing")}
 	}
 	scopestr, ok := scopeint.(string)
 	if !ok {
@@ -219,7 +211,7 @@ OUTER:
 		missingScopes = append(missingScopes, s.String())
 	}
 	if len(missingScopes) > 0 {
-		return fmt.Errorf("missing the following scopes: %s", strings.Join(missingScopes, ","))
+		return &TokenValidationError{fmt.Errorf("missing the following scopes: %s", strings.Join(missingScopes, ","))}
 	}
 
 	return nil
@@ -228,7 +220,7 @@ OUTER:
 func (e *Enforcer) validateGroups(t jwt.Token) error {
 	groupint, ok := t.Get("wlcg.groups")
 	if !ok {
-		return fmt.Errorf("wlcg.groups claim missing")
+		return &TokenValidationError{fmt.Errorf("wlcg.groups claim missing")}
 	}
 	groupints, ok := groupint.([]interface{})
 	if !ok {
@@ -255,7 +247,7 @@ OUTER:
 		missingGroups = append(missingGroups, g)
 	}
 	if len(missingGroups) > 0 {
-		return fmt.Errorf("missing the following groups: %s", strings.Join(missingGroups, ","))
+		return &TokenValidationError{fmt.Errorf("missing the following groups: %s", strings.Join(missingGroups, ","))}
 	}
 
 	return nil
