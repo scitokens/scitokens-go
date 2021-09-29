@@ -3,6 +3,7 @@ package scitokens
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/lestrrat-go/jwx/jwt"
 )
@@ -17,4 +18,22 @@ func PrintToken(w io.Writer, t jwt.Token) {
 	for k, v := range t.PrivateClaims() {
 		fmt.Fprintf(w, "\t%v: %v\n", k, v)
 	}
+}
+
+// GetScopes parses the scope claim and returns a list of all scopes.
+func GetScopes(t jwt.Token) ([]Scope, error) {
+	scopeint, ok := t.Get("scope")
+	if !ok {
+		return nil, &TokenValidationError{fmt.Errorf("scope claim missing")}
+	}
+	scopestr, ok := scopeint.(string)
+	if !ok {
+		return nil, fmt.Errorf("unable to cast scopes claim to string")
+	}
+	scopestrs := strings.Split(scopestr, " ")
+	scopes := make([]Scope, len(scopestrs))
+	for _, s := range scopestrs {
+		scopes = append(scopes, ParseScope(s))
+	}
+	return scopes, nil
 }
