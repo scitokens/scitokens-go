@@ -7,7 +7,8 @@ import (
 	"github.com/lestrrat-go/jwx/jwt"
 )
 
-func printToken(t jwt.Token, w io.Writer) {
+// PrintToken pretty-prints the token claims to w.
+func PrintToken(w io.Writer, t jwt.Token) {
 	fmt.Fprintf(w, "Subject: %s\n", t.Subject())
 	fmt.Fprintf(w, "Issuer: %s\n", t.Issuer())
 	fmt.Fprintf(w, "Audience: %s\n", t.Audience())

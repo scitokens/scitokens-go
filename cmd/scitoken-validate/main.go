@@ -6,7 +6,7 @@ import (
 	"log"
 	"os"
 
-	scitokens "github.com/retzkek/scitokens-go"
+	scitoken "github.com/retzkek/scitokens-go"
 	flag "github.com/spf13/pflag"
 )
 
@@ -67,15 +67,12 @@ FLAGS
 }
 
 func main() {
-	enf, err := scitokens.NewEnforcer(*issuers...)
+	enf, err := scitoken.NewEnforcer(*issuers...)
 	if err != nil {
 		log.Fatalf("failed to initialize enforcer: %s", err)
 	}
-	if *verbose {
-		enf.SetLogger(os.Stderr)
-	}
 	for _, s := range *scopes {
-		if err = enf.RequireScope(scitokens.ParseScope(s)); err != nil {
+		if err = enf.RequireScope(scitoken.ParseScope(s)); err != nil {
 			log.Fatalf("unable to require scope %s: %s", s, err)
 		}
 	}
@@ -105,8 +102,10 @@ func main() {
 		log.Printf("reading token from stdin")
 		t = os.Stdin
 	}
-	// TODO support validating multiple tokens
-	err = enf.ValidateTokenReader(t)
+	tok, err := enf.ValidateTokenReader(t)
+	if *verbose && tok != nil {
+		scitoken.PrintToken(os.Stderr, tok)
+	}
 	if err != nil {
 		log.Fatalf("token not valid: %s", err)
 	}

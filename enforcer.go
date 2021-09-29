@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"path"
 	"strings"
 
@@ -50,7 +51,6 @@ type Enforcer struct {
 	keys    jwk.Set
 	scopes  []Scope
 	groups  []string
-	logger  io.Writer
 }
 
 // NewEnforcer initializes a new enforcer for validating SciTokens from the
@@ -97,11 +97,6 @@ func (e *Enforcer) AddIssuer(ctx context.Context, issuer string) error {
 	return nil
 }
 
-// SetLogger sends verbose logging to the provided io.Writer.
-func (e *Enforcer) SetLogger(w io.Writer) {
-	e.logger = w
-}
-
 // RequireScope adds s to scopes to validate.
 func (e *Enforcer) RequireScope(s Scope) error {
 	e.scopes = append(e.scopes, s)
@@ -115,50 +110,90 @@ func (e *Enforcer) RequireGroup(group string) error {
 	return nil
 }
 
-// ValidateTokenString validates that the SciToken in the provided string is
-// valid and meets all constraints imposed by the Enforcer.
-func (e *Enforcer) ValidateTokenString(tokenstring string) error {
-	t, err := jwt.ParseString(tokenstring, jwt.WithKeySet(e.keys))
-	if err != nil {
-		return &TokenParseError{err}
+func (e *Enforcer) parseOptions() []jwt.ParseOption {
+	return []jwt.ParseOption{
+		jwt.WithKeySet(e.keys),
 	}
-	e.log(t)
-	return e.Validate(t)
 }
 
-// ValidateTokenReader validates that the SciToken read from the provided
-// io.Reader is valid and meets all constraints imposed by the Enforcer.
-func (e *Enforcer) ValidateTokenReader(r io.Reader) error {
-	t, err := jwt.ParseReader(r, jwt.WithKeySet(e.keys))
-	if err != nil {
-		return &TokenParseError{err}
-	}
-	e.log(t)
-	return e.Validate(t)
-}
-
-// ValidateTokenRequest validates that the SciToken read from the provided
-// http.Request is valid and meets all constraints imposed by the Enforcer.
+// ValidateToken parses and validates that the SciToken in the provided byte
+// slice is valid and meets all constraints imposed by the Enforcer (see
+// Validate).
 //
-// The token is returned and can be re-validated with Validate().
-func (e *Enforcer) ValidateTokenRequest(r *http.Request) (jwt.Token, error) {
-	t, err := jwt.ParseRequest(r, jwt.WithKeySet(e.keys))
+// The token is returned and can be re-validated with Validate(). Currently a
+// vanilla jwt.Token is returned, but at some point this may be expanded to a
+// custom SciToken type (which will still implement jwt.Token).
+func (e *Enforcer) ValidateToken(token []byte) (jwt.Token, error) {
+	t, err := jwt.Parse(token, e.parseOptions()...)
 	if err != nil {
 		return nil, &TokenParseError{err}
 	}
-	e.log(t)
 	return t, e.Validate(t)
 }
 
-func (e *Enforcer) log(t jwt.Token) {
-	if e.logger != nil {
-		printToken(t, e.logger)
+// ValidateTokenString parses and validates that the SciToken in the provided
+// string is valid and meets all constraints imposed by the Enforcer.
+// See ValidateToken.
+func (e *Enforcer) ValidateTokenString(tokenstring string) (jwt.Token, error) {
+	t, err := jwt.ParseString(tokenstring, e.parseOptions()...)
+	if err != nil {
+		return nil, &TokenParseError{err}
 	}
+	return t, e.Validate(t)
+}
+
+// ValidateTokenReader parses and validates that the SciToken read from the
+// provided io.Reader is valid and meets all constraints imposed by the
+// Enforcer. See ValidateToken.
+func (e *Enforcer) ValidateTokenReader(r io.Reader) (jwt.Token, error) {
+	t, err := jwt.ParseReader(r, e.parseOptions()...)
+	if err != nil {
+		return nil, &TokenParseError{err}
+	}
+	return t, e.Validate(t)
+}
+
+// ValidateTokenForm parses and validates that the SciToken read from the
+// provided url value is valid and meets all constraints imposed by the
+// Enforcer. See ValidateToken.
+func (e *Enforcer) ValidateTokenForm(values url.Values, name string) (jwt.Token, error) {
+	t, err := jwt.ParseForm(values, name, e.parseOptions()...)
+	if err != nil {
+		return nil, &TokenParseError{err}
+	}
+	return t, e.Validate(t)
+}
+
+// ValidateTokenHeader parses and validates that the SciToken read from the
+// provided http.Header is valid and meets all constraints imposed by the
+// Enforcer. See ValidateToken.
+func (e *Enforcer) ValidateTokenHeader(hdr http.Header, name string) (jwt.Token, error) {
+	t, err := jwt.ParseHeader(hdr, name, e.parseOptions()...)
+	if err != nil {
+		return nil, &TokenParseError{err}
+	}
+	return t, e.Validate(t)
+}
+
+// ValidateTokenRequest parses and validates that the SciToken read from the
+// provided http.Request is valid and meets all constraints imposed by the
+// Enforcer. See ValidateToken.
+func (e *Enforcer) ValidateTokenRequest(r *http.Request) (jwt.Token, error) {
+	t, err := jwt.ParseRequest(r, e.parseOptions()...)
+	if err != nil {
+		return nil, &TokenParseError{err}
+	}
+	return t, e.Validate(t)
 }
 
 // Validate checks that the SciToken is valid and meets all constraints imposed
-// by the Enforcer. This can be called multiple times, e.g. to test the token
-// against different scopes.
+// by the Enforcer, namely:
+// * the issuer is accepted (via AddIssuer) and the token was signed by it
+// * all scopes added by RequiredScope are present in the scope claim
+// * all groups added by RequiredGroup are present in the wlcg.groups claim
+//
+// This can be called multiple times, e.g. to test the token against different
+// scopes.
 func (e *Enforcer) Validate(t jwt.Token) error {
 	// validate standard claims
 	if _, ok := e.issuers[t.Issuer()]; !ok {
