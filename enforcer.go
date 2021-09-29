@@ -9,7 +9,6 @@ import (
 	"path"
 	"strings"
 
-	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/lestrrat-go/jwx/jwt"
 )
 
@@ -17,19 +16,21 @@ import (
 // certain issuer, and that they allow the requested resource.
 type Enforcer struct {
 	issuers map[string]bool
-	keys    jwk.Set
+	ikm     *IssuerKeyManager
 	scopes  []Scope
 	groups  []string
 }
 
 // NewEnforcer initializes a new enforcer for validating SciTokens from the
-// provided issuer(s).
-func NewEnforcer(issuers ...string) (*Enforcer, error) {
+// provided issuer(s). The context object should be cancelled when the process
+// is done with the enforcer.
+func NewEnforcer(ctx context.Context, issuers ...string) (*Enforcer, error) {
 	if len(issuers) == 0 {
 		return nil, fmt.Errorf("must accept at least one issuer")
 	}
 	e := Enforcer{
 		issuers: make(map[string]bool),
+		ikm:     NewIssuerKeyManager(ctx),
 		scopes:  make([]Scope, 0),
 		groups:  make([]string, 0),
 	}
@@ -43,24 +44,9 @@ func NewEnforcer(issuers ...string) (*Enforcer, error) {
 
 // AddIssuer adds an accepted issuer and fetches its signing keys.
 func (e *Enforcer) AddIssuer(ctx context.Context, issuer string) error {
-	keys, err := GetIssuerKeys(ctx, issuer)
+	err := e.ikm.AddIssuer(ctx, issuer)
 	if err != nil {
 		return fmt.Errorf("failed to fetch keyset for issuer %s: %s", issuer, err)
-	}
-	if e.keys == nil {
-		e.keys = keys
-	} else {
-		// Merge keys into existing KeySet. Ideally we'd maintain multiple
-		// keysets and pick at token parse time, but this is not currently
-		// feasible. See https://github.com/lestrrat-go/jwx/issues/474.
-		iter := keys.Iterate(ctx)
-		for iter.Next(ctx) {
-			k, ok := iter.Pair().Value.(jwk.Key)
-			if !ok {
-				return fmt.Errorf("iterating over keys yielded a non-key")
-			}
-			e.keys.Add(k)
-		}
 	}
 	e.issuers[issuer] = true
 	return nil
@@ -81,7 +67,7 @@ func (e *Enforcer) RequireGroup(group string) error {
 
 func (e *Enforcer) parseOptions() []jwt.ParseOption {
 	return []jwt.ParseOption{
-		jwt.WithKeySet(e.keys),
+		jwt.WithKeySetProvider(e.ikm),
 	}
 }
 

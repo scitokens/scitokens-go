@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log"
@@ -67,7 +68,9 @@ FLAGS
 }
 
 func main() {
-	enf, err := scitoken.NewEnforcer(*issuers...)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	enf, err := scitoken.NewEnforcer(ctx, *issuers...)
 	if err != nil {
 		log.Fatalf("failed to initialize enforcer: %s", err)
 	}
