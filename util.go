@@ -37,3 +37,24 @@ func GetScopes(t jwt.Token) ([]Scope, error) {
 	}
 	return scopes, nil
 }
+
+// GetGroups parses the wlcg.groups claim and returns a list of all groups.
+func GetGroups(t jwt.Token) ([]string, error) {
+	groupint, ok := t.Get("wlcg.groups")
+	if !ok {
+		return nil, &TokenValidationError{fmt.Errorf("wlcg.groups claim missing")}
+	}
+	groupints, ok := groupint.([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("unable to cast wlcg.groups claim to slice")
+	}
+	groups := make([]string, len(groupints))
+	for _, g := range groupints {
+		gs, ok := g.(string)
+		if !ok {
+			return nil, fmt.Errorf("unable to cast wlcg.group \"%v\" to string", g)
+		}
+		groups = append(groups, gs)
+	}
+	return groups, nil
+}

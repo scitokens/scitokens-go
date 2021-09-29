@@ -213,23 +213,9 @@ OUTER:
 }
 
 func (e *Enforcer) validateGroups(t jwt.Token) error {
-	groupint, ok := t.Get("wlcg.groups")
-	if !ok {
-		return &TokenValidationError{fmt.Errorf("wlcg.groups claim missing")}
-	}
-	groupints, ok := groupint.([]interface{})
-	if !ok {
-		return fmt.Errorf("unable to cast wlcg.groups claim to slice")
-	}
-	groups := make([]string, len(groupints))
-	for _, g := range groupints {
-		gs, ok := g.(string)
-		if !ok {
-			return fmt.Errorf("unable to cast wlcg.group \"%v\" to string", g)
-		}
-		groups = append(groups, gs)
-	}
-	if !ok {
+	groups, err := GetGroups(t)
+	if err != nil {
+		return err
 	}
 	missingGroups := make([]string, 0)
 OUTER:
