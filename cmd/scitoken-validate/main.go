@@ -68,23 +68,27 @@ FLAGS
 }
 
 func main() {
+	// The Enforcer has some background processes, so we need a context to tell
+	// it to clean up before exiting.
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	enf, err := scitoken.NewEnforcer(ctx, *issuers...)
 	if err != nil {
 		log.Fatalf("failed to initialize enforcer: %s", err)
 	}
+
+	// Validation constraints can be added to the base Enforcer...
 	for _, s := range *scopes {
-		if err = enf.RequireScope(scitoken.ParseScope(s)); err != nil {
-			log.Fatalf("unable to require scope %s: %s", s, err)
-		}
-	}
-	for _, g := range *groups {
-		if err = enf.RequireGroup(g); err != nil {
-			log.Fatalf("unable to require group %s: %s", g, err)
-		}
+		enf.RequireScope(scitoken.ParseScope(s))
 	}
 
+	// ... or added on at parse time.
+	validators := make([]scitoken.Validator, len(*groups))
+	for i, g := range *groups {
+		validators[i] = scitoken.WithGroup(g)
+	}
+
+	// Read in the token...
 	filename := os.Getenv("SCITOKEN")
 	if filename == "" {
 		filename = fmt.Sprintf("/tmp/scitoken_u%d", os.Getuid())
@@ -105,11 +109,15 @@ func main() {
 		log.Printf("reading token from stdin")
 		t = os.Stdin
 	}
-	tok, err := enf.ValidateTokenReader(t)
+
+	// ... and parse and validate it at the same time. It can also be validated
+	// against additional constraints by calling scitoken.Validate().
+	tok, err := enf.ValidateTokenReader(t, validators...)
+
 	if *verbose && tok != nil {
 		scitoken.PrintToken(os.Stderr, tok)
 	}
 	if err != nil {
-		log.Fatalf("token not valid: %s", err)
+		log.Fatal(err)
 	}
 }
