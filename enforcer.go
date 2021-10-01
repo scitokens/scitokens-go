@@ -68,6 +68,7 @@ func (e *Enforcer) RequireValidator(v Validator) error {
 func (e *Enforcer) parseOptions() []jwt.ParseOption {
 	return []jwt.ParseOption{
 		jwt.WithKeySetProvider(e.ikm),
+		jwt.InferAlgorithmFromKey(true),
 	}
 }
 
