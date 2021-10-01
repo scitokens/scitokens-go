@@ -7,7 +7,7 @@ import (
 	"log"
 	"os"
 
-	scitoken "github.com/retzkek/scitokens-go"
+	scitoken "github.com/scitokens/scitokens-go"
 	flag "github.com/spf13/pflag"
 )
 
