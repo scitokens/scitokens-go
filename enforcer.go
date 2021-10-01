@@ -187,5 +187,11 @@ func (e *Enforcer) Validate(t SciToken, constraints ...Validator) error {
 	for i, v := range constraints {
 		opts[i+len(e.validators)] = jwt.WithValidator(v)
 	}
-	return jwt.Validate(t, opts...)
+	if err := jwt.Validate(t, opts...); err != nil {
+		// It doesn't appear that Validate can return a non-validation error
+		// (i.e. some internal error), and there's no way to differentiate if so
+		// (besides error message parsing, bleh).
+		return &TokenValidationError{err}
+	}
+	return nil
 }
