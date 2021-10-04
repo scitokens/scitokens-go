@@ -37,12 +37,6 @@ type AuthServerMetadata struct {
 	ResponseTypes   []string `json:"response_types_supported"`
 }
 
-type NotFoundError struct{}
-
-func (e NotFoundError) Error() string {
-	return "404 not found"
-}
-
 // FetchMetadata retrieves the OAUTH 2.0 authorization server metadata from the
 // given URL, which must include the complete well-known path to the resource.
 func FetchMetadata(ctx context.Context, urlstring string) (*AuthServerMetadata, error) {

@@ -4,6 +4,12 @@ import (
 	"fmt"
 )
 
+type NotFoundError struct{}
+
+func (e NotFoundError) Error() string {
+	return "404 not found"
+}
+
 type TokenParseError struct {
 	Err error
 }
