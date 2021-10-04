@@ -2,9 +2,41 @@ package scitokens
 
 import (
 	"testing"
+	"time"
 
 	"github.com/lestrrat-go/jwx/jwt"
 	"github.com/stretchr/testify/assert"
+)
+
+type testToken struct {
+	Name    string
+	Data    []byte
+	Subject string
+	Issuer  string
+	Scopes  []Scope
+	Groups  []string
+}
+
+var (
+	// It goes without saying, but I'll say it anyways:
+	// EXPIRED TOKENS ONLY
+	testTokens = []testToken{
+		{
+			Name:    "WLCG test issuer",
+			Data:    []byte(`eyJraWQiOiJyc2ExIiwiYWxnIjoiUlMyNTYifQ.eyJ3bGNnLnZlciI6IjEuMCIsInN1YiI6ImM3NWMzMmNiLTU0ZGUtNDY2MC04NjVjLTFkNWM4NjlkMGQ3YSIsImF1ZCI6Imh0dHBzOlwvXC93bGNnLmNlcm4uY2hcL2p3dFwvdjFcL2FueSIsIm5iZiI6MTYzMzEyMTE1OCwic2NvcGUiOiJvcGVuaWQgcHJvZmlsZSBvZmZsaW5lX2FjY2VzcyBlbWFpbCB3bGNnIHdsY2cuZ3JvdXBzIiwiaXNzIjoiaHR0cHM6XC9cL3dsY2cuY2xvdWQuY25hZi5pbmZuLml0XC8iLCJleHAiOjE2MzMxMjQ3NTgsImlhdCI6MTYzMzEyMTE1OCwianRpIjoiOWU4OGFmNzAtZGIxMi00NWRlLWEwZTMtZDc3YTA0OTNhNzM0IiwiY2xpZW50X2lkIjoiY2Q1NjIzZTMtMTZkYS00MTU2LWEzNWYtYzBiOWU0MTkwZTA0Iiwid2xjZy5ncm91cHMiOlsiXC93bGNnIl19.dlz0VLighqFIyQ6wRk8kehRACfVnqSxRfZrAAaqneFgNCfhbGY65ZaAgCPHl2avfqRumYOqHr9PTbQLFp9bx6CV_Oa7kWguGOo2Dm59aoGO_XrlvhtGYJ3uxYUN6jQ8ZyQYaR8fgJmC3m1S_sVu56yg0HMC1jfFhCWec-cyes80`),
+			Subject: "c75c32cb-54de-4660-865c-1d5c869d0d7a",
+			Issuer:  "https://wlcg.cloud.cnaf.infn.it/",
+			Scopes: []Scope{
+				{"openid", ""},
+				{"profile", ""},
+				{"offline_access", ""},
+				{"email", ""},
+				{"wlcg", ""},
+				{"wlcg.groups", ""},
+			},
+			Groups: []string{"/wlcg"},
+		},
+	}
 )
 
 func TestNewSciToken(t *testing.T) {
@@ -80,5 +112,36 @@ func TestNewSciToken(t *testing.T) {
 		}
 		_, err := NewSciToken(t1)
 		assert.Error(err, "NewSciToken should fail")
+	})
+	t.Run("Parsed SciTokens", func(t *testing.T) {
+		assert := assert.New(t)
+		for _, tok := range testTokens {
+			t.Run(tok.Name, func(t *testing.T) {
+				t.Parallel()
+				t1, err := jwt.Parse(tok.Data)
+				if !assert.NoError(err, "jwt.Parse should succeed") {
+					return
+				}
+				if !assert.Error(jwt.Validate(t1), "jwt.Validate should fail since token is expired") {
+					return
+				}
+				// extend token expiration
+				t1.Set("exp", time.Now().Add(60*time.Second))
+				if !assert.NoError(jwt.Validate(t1), "jwt.Validate should pass with token extended") {
+					return
+				}
+				st, err := NewSciToken(t1)
+				if !assert.NoError(err, "NewSciToken should succeed") {
+					return
+				}
+				if !assert.NotNil(st, "SciToken should not be nil") {
+					return
+				}
+				assert.Equal(st.Subject(), tok.Subject)
+				assert.Equal(st.Issuer(), tok.Issuer)
+				assert.Equal(st.Scopes(), tok.Scopes)
+				assert.Equal(st.Groups(), tok.Groups)
+			})
+		}
 	})
 }
