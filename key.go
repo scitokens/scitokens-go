@@ -83,7 +83,7 @@ func IssuerKeyURL(ctx context.Context, issuer string) (string, error) {
 			case NotFoundError:
 				continue
 			}
-			return "", fmt.Errorf("status code %s when fetching metadata for %s", err, issuer)
+			return "", fmt.Errorf("fetching metadata for %s: %s", issuer, err)
 		}
 	}
 	if meta == nil {
