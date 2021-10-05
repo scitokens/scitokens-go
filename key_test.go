@@ -2,13 +2,18 @@ package scitokens
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"path"
 	"testing"
 	"text/template"
+	"time"
 
+	"github.com/lestrrat-go/jwx/jwa"
 	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/lestrrat-go/jwx/jwt"
 	"github.com/stretchr/testify/assert"
@@ -44,30 +49,54 @@ var (
     "token"
   ]
 }`
-	testMetadata = template.Must(template.New("metadata").Parse(testMetadataTemplate))
-	testJWKs     = `{
-  "keys": [
-    {
-      "kty": "RSA",
-      "e": "AQAB",
-      "kid": "rsa1",
-      "n": "gTuRCL3TJU40hx43uXqKUWSIanP6D63A8u0V4GTsdvdamGOUyq084_aeC38pK8eI-D4JaUyTKoyiR2vFRPd3UnqhNVx-smHwywYu2q4lWpAKia2iTnXJeEh9cAcdjWxzgj41MNiWtpoJmJLoNWMx3OGvyNT9z4hNxcSkREmh-LU"
-    }
-  ]
-}`
 )
 
-func fakeAuthServerHandler(w http.ResponseWriter, r *http.Request) {
+type fakeAuthServer struct {
+	privateKey jwk.Key
+	publicKeys jwk.Set
+	metadata   *template.Template
+}
+
+func newFakeAuthServer() (*fakeAuthServer, error) {
+	raw, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return nil, err
+	}
+	k, err := jwk.New(raw)
+	if err != nil {
+		return nil, err
+	}
+	if k.Set("kid", "testkey1") != nil {
+		return nil, err
+	}
+	ks := jwk.NewSet()
+	pk, err := k.PublicKey()
+	if err != nil {
+		return nil, err
+	}
+	ks.Add(pk)
+
+	t, err := template.New("metadata").Parse(testMetadataTemplate)
+	if err != nil {
+		return nil, err
+	}
+
+	return &fakeAuthServer{k, ks, t}, nil
+
+}
+
+func (s *fakeAuthServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path {
 	case "/.well-known/oauth-authorization-server",
 		"/.well-known/openid-configuration":
-		if err := testMetadata.Execute(w, r); err != nil {
+		if err := s.metadata.Execute(w, r); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	case "/bad-metadata":
 		fmt.Fprintln(w, "{foo:bar}")
 	case "/jwk":
-		fmt.Fprintln(w, testJWKs)
+		enc := json.NewEncoder(w)
+		enc.Encode(s.publicKeys)
 	case "/private":
 		http.Error(w, "forbidden", http.StatusForbidden)
 	case "/error":
@@ -77,9 +106,33 @@ func fakeAuthServerHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// MakeToken creates and signs a test token with the given scopes and groups.
+func (s *fakeAuthServer) MakeToken(issuer string, scopes, groups interface{}) ([]byte, error) {
+	t := jwt.New()
+	t.Set("iss", issuer)
+	t.Set("iat", time.Now())
+	t.Set("nbf", time.Now())
+	t.Set("exp", time.Now().Add(1*time.Hour))
+	if scopes != nil {
+		if err := t.Set("scope", scopes); err != nil {
+			return nil, err
+		}
+	}
+	if groups != nil {
+		if err := t.Set("wlcg.groups", groups); err != nil {
+			return nil, err
+		}
+	}
+	return jwt.Sign(t, jwa.RS256, s.privateKey)
+}
+
 func TestFetchMetadata(t *testing.T) {
 	assert := assert.New(t)
-	ts := httptest.NewTLSServer(http.HandlerFunc(fakeAuthServerHandler))
+	srv, err := newFakeAuthServer()
+	if !assert.NoError(err) {
+		return
+	}
+	ts := httptest.NewTLSServer(srv)
 	defer ts.Close()
 	http.DefaultClient = ts.Client()
 
@@ -152,7 +205,11 @@ func TestFetchMetadata(t *testing.T) {
 
 func TestIssuerKeyURL(t *testing.T) {
 	assert := assert.New(t)
-	ts := httptest.NewTLSServer(http.HandlerFunc(fakeAuthServerHandler))
+	srv, err := newFakeAuthServer()
+	if !assert.NoError(err) {
+		return
+	}
+	ts := httptest.NewTLSServer(srv)
 	defer ts.Close()
 	http.DefaultClient = ts.Client()
 
@@ -179,9 +236,7 @@ func TestIssuerKeyURL(t *testing.T) {
 			ts := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				switch r.URL.Path {
 				case path.Join("/.well-known", wk):
-					if err := testMetadata.Execute(w, r); err != nil {
-						http.Error(w, err.Error(), http.StatusInternalServerError)
-					}
+					fmt.Fprintln(w, "{\"jwks_uri\": \"https://example.com/jwk\"}")
 				default:
 					http.Error(w, "bad path", http.StatusNotFound)
 				}
@@ -192,14 +247,18 @@ func TestIssuerKeyURL(t *testing.T) {
 			if !assert.NoError(err, "IssuerKeyURL should succeed") {
 				return
 			}
-			assert.Equal(u, ts.URL+"/jwk")
+			assert.Equal(u, "https://example.com/jwk")
 		})
 	}
 }
 
 func TestGetIssuerKeys(t *testing.T) {
 	assert := assert.New(t)
-	ts := httptest.NewTLSServer(http.HandlerFunc(fakeAuthServerHandler))
+	srv, err := newFakeAuthServer()
+	if !assert.NoError(err) {
+		return
+	}
+	ts := httptest.NewTLSServer(srv)
 	defer ts.Close()
 	http.DefaultClient = ts.Client()
 
@@ -208,7 +267,7 @@ func TestGetIssuerKeys(t *testing.T) {
 		assert.Error(err, "GetIssuerKeys should fail")
 	})
 
-	_, err := GetIssuerKeys(context.Background(), ts.URL)
+	_, err = GetIssuerKeys(context.Background(), ts.URL)
 	if !assert.NoError(err, "GetIssuerKeys should succeed") {
 		return
 	}
@@ -216,7 +275,11 @@ func TestGetIssuerKeys(t *testing.T) {
 
 func TestIssuerKeyManager(t *testing.T) {
 	assert := assert.New(t)
-	ts := httptest.NewTLSServer(http.HandlerFunc(fakeAuthServerHandler))
+	srv, err := newFakeAuthServer()
+	if !assert.NoError(err) {
+		return
+	}
+	ts := httptest.NewTLSServer(srv)
 	defer ts.Close()
 	http.DefaultClient = ts.Client()
 
