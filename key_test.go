@@ -152,6 +152,7 @@ func TestFetchMetadata(t *testing.T) {
 			return
 		}
 		assert.ErrorIs(err, NotFoundError{})
+		assert.EqualError(err, "404 not found")
 	})
 
 	t.Run("forbidden metadata server response", func(t *testing.T) {

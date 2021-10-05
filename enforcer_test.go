@@ -84,13 +84,13 @@ func TestEnforcer(t *testing.T) {
 		}
 
 		_, err = enf.ValidateToken(nt1)
-		assert.Error(err, "ValidateToken should fail for invalid token")
+		assert.EqualError(err, "error while parsing token: failed to parse token: invalid character 'o' in literal null (expecting 'u')")
 
 		_, err = enf.ValidateToken(nt2)
-		assert.Error(err, "ValidateToken should fail for token with invalid scope")
+		assert.EqualError(err, "error while parsing token: unable to cast scopes claim to string")
 
 		_, err = enf.ValidateToken(nt3)
-		assert.Error(err, "ValidateToken should fail for token with invalid groups")
+		assert.EqualError(err, "error while parsing token: unable to cast wlcg.groups claim to slice")
 
 		_, err = enf.ValidateToken(nt4)
 		assert.Error(err, "ValidateToken should fail for token with untrusted issuer")
@@ -104,7 +104,7 @@ func TestEnforcer(t *testing.T) {
 		if !assert.NoError(err) {
 			return
 		}
-		assert.Error(enf.Validate(snt4), "Validate should fail for token with untrusted issuer")
+		assert.EqualError(enf.Validate(snt4), "token invalid: untrusted issuer https://example.com")
 
 		st1, err := enf.ValidateToken(t1)
 		assert.NoError(err, "ValidateToken should succeed for token with no scopes or groups")
