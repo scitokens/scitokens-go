@@ -27,7 +27,7 @@ func WithScope(scope Scope) Validator {
 func (v scopeValidator) Validate(ctx context.Context, t jwt.Token) error {
 	st, ok := t.(SciToken)
 	if !ok {
-		return fmt.Errorf("token is not a SciToken")
+		return NotSciTokenError
 	}
 	for _, ss := range st.Scopes() {
 		if ss.Allowed(v.scope.Auth, v.scope.Path) {
@@ -50,7 +50,7 @@ func WithGroup(group string) Validator {
 func (v groupValidator) Validate(ctx context.Context, t jwt.Token) error {
 	st, ok := t.(SciToken)
 	if !ok {
-		return fmt.Errorf("token is not a SciToken")
+		return NotSciTokenError
 	}
 	for _, gg := range st.Groups() {
 		if gg == v.group {

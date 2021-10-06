@@ -93,7 +93,7 @@ func TestEnforcer(t *testing.T) {
 		assert.EqualError(err, "error while parsing token: unable to cast wlcg.groups claim to slice")
 
 		_, err = enf.ValidateToken(nt4)
-		assert.Error(err, "ValidateToken should fail for token with untrusted issuer")
+		assert.ErrorIs(err, UntrustedIssuerError)
 
 		// we have to go around the enforcer parsing to check the logic in Validate
 		jnt4, err := jwt.Parse(nt4)
@@ -104,7 +104,9 @@ func TestEnforcer(t *testing.T) {
 		if !assert.NoError(err) {
 			return
 		}
-		assert.EqualError(enf.Validate(snt4), "token invalid: untrusted issuer https://example.com")
+		err = enf.Validate(snt4)
+		assert.ErrorIs(err, UntrustedIssuerError)
+		assert.EqualError(err, "token invalid: issuer not trusted")
 
 		st1, err := enf.ValidateToken(t1)
 		assert.NoError(err, "ValidateToken should succeed for token with no scopes or groups")

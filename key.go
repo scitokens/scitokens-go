@@ -3,6 +3,7 @@ package scitokens
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -51,7 +52,7 @@ func FetchMetadata(ctx context.Context, urlstring string) (*AuthServerMetadata, 
 	defer r.Body.Close()
 	switch {
 	case r.StatusCode == http.StatusNotFound:
-		return nil, NotFoundError{}
+		return nil, MetadataNotFoundError
 	case r.StatusCode >= 400:
 		return nil, fmt.Errorf("%s", r.Status)
 	}
@@ -78,12 +79,10 @@ func IssuerKeyURL(ctx context.Context, issuer string) (string, error) {
 		meta, err = FetchMetadata(ctx, issuer+path.Join("/.well-known", wk))
 		if err == nil {
 			break
+		} else if errors.Is(err, MetadataNotFoundError) {
+			continue
 		} else {
-			switch err.(type) {
-			case NotFoundError:
-				continue
-			}
-			return "", fmt.Errorf("fetching metadata for %s: %s", issuer, err)
+			return "", fmt.Errorf("fetching metadata for %s: %w", issuer, err)
 		}
 	}
 	if meta == nil {
@@ -116,7 +115,7 @@ func NewIssuerKeyManager(ctx context.Context) *IssuerKeyManager {
 // at regular intervals, and can be accessed with GetIssuerKeys().
 func (m *IssuerKeyManager) AddIssuer(ctx context.Context, issuer string) error {
 	if m.keysets == nil {
-		return fmt.Errorf("IssuerKeyManager not initialized")
+		return IKMNotInitializedError
 	}
 	if _, ok := m.issuerKeyURLs[issuer]; !ok {
 		url, err := IssuerKeyURL(ctx, issuer)
@@ -135,11 +134,11 @@ func (m *IssuerKeyManager) AddIssuer(ctx context.Context, issuer string) error {
 // AddIssuer() must be called first for this issuer.
 func (m *IssuerKeyManager) GetIssuerKeys(ctx context.Context, issuer string) (jwk.Set, error) {
 	if m.keysets == nil {
-		return nil, fmt.Errorf("IssuerKeyManager not initialized")
+		return nil, IKMNotInitializedError
 	}
 	url, ok := m.issuerKeyURLs[issuer]
 	if !ok {
-		return nil, fmt.Errorf("issuer %s not in IssuerKeyManager", issuer)
+		return nil, UntrustedIssuerError
 	}
 	return m.keysets.Fetch(ctx, url)
 }
@@ -148,7 +147,7 @@ func (m *IssuerKeyManager) GetIssuerKeys(ctx context.Context, issuer string) (jw
 // The issuer must first be added to the IssuerKeyManager with AddIssuer().
 func (m *IssuerKeyManager) KeySetFrom(t jwt.Token) (jwk.Set, error) {
 	if m.keysets == nil {
-		return nil, fmt.Errorf("IssuerKeyManager not initialized")
+		return nil, IKMNotInitializedError
 	}
 	return m.GetIssuerKeys(context.Background(), t.Issuer())
 }

@@ -151,8 +151,7 @@ func TestFetchMetadata(t *testing.T) {
 		if !assert.Error(err, "FetchMetadata should fail") {
 			return
 		}
-		assert.ErrorIs(err, NotFoundError{})
-		assert.EqualError(err, "404 not found")
+		assert.ErrorIs(err, MetadataNotFoundError)
 	})
 
 	t.Run("forbidden metadata server response", func(t *testing.T) {
@@ -289,11 +288,17 @@ func TestIssuerKeyManager(t *testing.T) {
 
 	t.Run("IssuerKeyManager not initialized", func(t *testing.T) {
 		ikm := IssuerKeyManager{}
-		assert.Error(ikm.AddIssuer(ctx, "https://example.com"))
-		_, err := ikm.GetIssuerKeys(ctx, "https://example.com")
+		err := ikm.AddIssuer(ctx, "https://example.com")
 		assert.Error(err)
+		assert.ErrorIs(err, IKMNotInitializedError)
+
+		_, err = ikm.GetIssuerKeys(ctx, "https://example.com")
+		assert.Error(err)
+		assert.ErrorIs(err, IKMNotInitializedError)
+
 		_, err = ikm.KeySetFrom(jwt.New())
 		assert.Error(err)
+		assert.ErrorIs(err, IKMNotInitializedError)
 	})
 
 	ikm := NewIssuerKeyManager(ctx)
@@ -317,6 +322,7 @@ func TestIssuerKeyManager(t *testing.T) {
 	t.Run("get issuer keys", func(t *testing.T) {
 		_, err := ikm.GetIssuerKeys(ctx, "https://example.com")
 		assert.Error(err, "GetIssuerKeys should fail for issuer that has not been added")
+		assert.ErrorIs(err, UntrustedIssuerError)
 
 		ks, err := ikm.GetIssuerKeys(ctx, ts.URL)
 		if !assert.NoError(err, "GetIssuerKeys should succeed") {
@@ -330,6 +336,7 @@ func TestIssuerKeyManager(t *testing.T) {
 		t1.Set("iss", "https://example.com")
 		_, err := ikm.KeySetFrom(t1)
 		assert.Error(err, "KeySetFrom should fail for token with issuer that has not been added")
+		assert.ErrorIs(err, UntrustedIssuerError)
 
 		t1.Set("iss", ts.URL)
 		ks, err := ikm.KeySetFrom(t1)

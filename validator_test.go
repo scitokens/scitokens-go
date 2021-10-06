@@ -20,7 +20,7 @@ func TestScopeValidator(t *testing.T) {
 	}
 
 	v := WithScope(Scope{"read", "/foo"})
-	assert.Error(v.Validate(ctx, t1), "cannot validate non-SciToken")
+	assert.ErrorIs(v.Validate(ctx, t1), NotSciTokenError, "cannot validate non-SciToken")
 	assert.NoError(v.Validate(ctx, st1), "token has read permission on /foo")
 
 	v = WithScope(Scope{"read", "/foo/bar"})
@@ -54,7 +54,7 @@ func TestGroupValidator(t *testing.T) {
 	}
 
 	v := WithGroup("/foo")
-	assert.Error(v.Validate(ctx, t1), "cannot validate non-SciToken")
+	assert.ErrorIs(v.Validate(ctx, t1), NotSciTokenError, "cannot validate non-SciToken")
 	assert.NoError(v.Validate(ctx, st1), "token has group foo")
 
 	v = WithGroup("foo")

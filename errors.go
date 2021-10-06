@@ -1,27 +1,37 @@
 package scitokens
 
 import (
+	"errors"
 	"fmt"
 )
 
-type NotFoundError struct{}
-
-func (e NotFoundError) Error() string {
-	return "404 not found"
-}
+var (
+	MetadataNotFoundError  = errors.New("metadata not found")
+	IKMNotInitializedError = errors.New("IssuerKeyManager not initialized")
+	UntrustedIssuerError   = errors.New("issuer not trusted")
+	NotSciTokenError       = errors.New("token is not a SciToken")
+)
 
 type TokenParseError struct {
 	Err error
 }
 
-func (t *TokenParseError) Error() string {
-	return fmt.Sprintf("error while parsing token: %s", t.Err)
+func (e *TokenParseError) Error() string {
+	return fmt.Sprintf("error while parsing token: %s", e.Err)
+}
+
+func (e *TokenParseError) Unwrap() error {
+	return e.Err
 }
 
 type TokenValidationError struct {
 	Err error
 }
 
-func (t *TokenValidationError) Error() string {
-	return fmt.Sprintf("token invalid: %s", t.Err)
+func (e *TokenValidationError) Error() string {
+	return fmt.Sprintf("token invalid: %s", e.Err)
+}
+
+func (e *TokenValidationError) Unwrap() error {
+	return e.Err
 }

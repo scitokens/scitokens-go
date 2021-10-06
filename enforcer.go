@@ -2,6 +2,7 @@ package scitokens
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -23,7 +24,7 @@ type Enforcer struct {
 // is done with the enforcer.
 func NewEnforcer(ctx context.Context, issuers ...string) (*Enforcer, error) {
 	if len(issuers) == 0 {
-		return nil, fmt.Errorf("must accept at least one issuer")
+		return nil, errors.New("must accept at least one issuer")
 	}
 	e := Enforcer{
 		issuers:    make(map[string]bool),
@@ -42,7 +43,7 @@ func NewEnforcer(ctx context.Context, issuers ...string) (*Enforcer, error) {
 func (e *Enforcer) AddIssuer(ctx context.Context, issuer string) error {
 	err := e.ikm.AddIssuer(ctx, issuer)
 	if err != nil {
-		return fmt.Errorf("failed to fetch keyset for issuer %s: %s", issuer, err)
+		return fmt.Errorf("failed to fetch keyset for issuer %s: %w", issuer, err)
 	}
 	e.issuers[issuer] = true
 	return nil
@@ -179,7 +180,7 @@ func (e *Enforcer) ValidateTokenRequest(r *http.Request, constraints ...Validato
 func (e *Enforcer) Validate(t SciToken, constraints ...Validator) error {
 	// validate standard claims
 	if _, ok := e.issuers[t.Issuer()]; !ok {
-		return &TokenValidationError{fmt.Errorf("untrusted issuer %s", t.Issuer())}
+		return &TokenValidationError{UntrustedIssuerError}
 	}
 	opts := make([]jwt.ValidateOption, len(e.validators)+len(constraints))
 	for i, v := range e.validators {
