@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"io"
 	"log"
 	"os"
 
@@ -26,9 +26,8 @@ func init() {
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "%s: Basic SciToken validator.\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, `
-The SciToken will be read from a file pointed to by the SCITOKEN environment
-variable, or if undefined from a file named like /tmp/scitoken_u$UID, otherwise
-read from stdin. Currently only one token is expected to be in the file.
+The SciToken will be read from the environment per https://doi.org/10.5281/zenodo.3937438,
+otherwise read from stdin. Currently only one token is expected to be in the file.
 
 At least one token issuer must be specified with the --issuer/-i flag, which can
 be repeated. Signing keys will be fetched for each issuer to validate the tokens
@@ -88,31 +87,14 @@ func main() {
 		validators[i] = scitoken.WithGroup(g)
 	}
 
-	// Read in the token...
-	filename := os.Getenv("SCITOKEN")
-	if filename == "" {
-		filename = fmt.Sprintf("/tmp/scitoken_u%d", os.Getuid())
-		if _, err := os.Stat(filename); err != nil {
-			filename = ""
-		}
+	// Read in the token from the environment or stdin, and parse and validate
+	// it at the same time. It can also be validated against additional
+	// constraints by calling scitoken.Validate().
+	tok, err := enf.ValidateTokenEnvironment(validators...)
+	if errors.Is(err, scitoken.TokenNotFoundError) {
+		log.Printf("no token found in environment, reading from stdin")
+		tok, err = enf.ValidateTokenReader(os.Stdin, validators...)
 	}
-	var t io.Reader
-	if filename != "" {
-		log.Printf("reading token from file %s", filename)
-		f, err := os.Open(filename)
-		if err != nil {
-			log.Fatalf("error opening token file %s", filename)
-		}
-		defer f.Close()
-		t = f
-	} else {
-		log.Printf("reading token from stdin")
-		t = os.Stdin
-	}
-
-	// ... and parse and validate it at the same time. It can also be validated
-	// against additional constraints by calling scitoken.Validate().
-	tok, err := enf.ValidateTokenReader(t, validators...)
 
 	if *verbose && tok != nil {
 		scitoken.PrintToken(os.Stderr, tok)

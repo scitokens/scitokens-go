@@ -10,6 +10,7 @@ var (
 	IKMNotInitializedError = errors.New("IssuerKeyManager not initialized")
 	UntrustedIssuerError   = errors.New("issuer not trusted")
 	NotSciTokenError       = errors.New("token is not a SciToken")
+	TokenNotFoundError     = errors.New("token not found")
 )
 
 type TokenParseError struct {

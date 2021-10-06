@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 
 	"github.com/lestrrat-go/jwx/jwt"
 )
@@ -167,6 +169,60 @@ func (e *Enforcer) ValidateTokenRequest(r *http.Request, constraints ...Validato
 		return nil, &TokenParseError{err}
 	}
 	return st, e.Validate(st, constraints...)
+}
+
+// ValidateTokenEnvironment searches for a SciToken in the execution
+// environment, per the following rules (https://doi.org/10.5281/zenodo.3937438),
+// then parses and validates it meets all constraints imposed by the Enforcer:
+//
+//   1. If the BEARER_TOKEN environment variable is set, then the value is taken
+//   to be the token contents.
+//
+//   2. If the BEARER_TOKEN_FILE environment variable is set, then its value is
+//   interpreted as a filename. The contents of the specified file are taken to
+//   be the token contents.
+//
+//   3. If the XDG_RUNTIME_DIR environment variable is set, then take the token
+//   from the contents of $XDG_RUNTIME_DIR/bt_u$ID.
+//
+//   4. Otherwise, take the token from /$TMP/bt_u$ID, where $TMP is TMPDIR if
+//   set, or /tmp or other OS-appropriate temp directory (see os.Tempdir())
+//
+// If no token is found in any of these locations, a TokenNotFoundError is
+// returned.
+func (e *Enforcer) ValidateTokenEnvironment(constraints ...Validator) (SciToken, error) {
+	var data []byte
+	if ts, ok := os.LookupEnv("BEARER_TOKEN"); ok {
+		data = []byte(ts)
+	} else {
+		fname := tokenFilename()
+		if fname == "" {
+			return nil, TokenNotFoundError
+		}
+		var err error
+		data, err = os.ReadFile(fname)
+		if err != nil {
+			return nil, fmt.Errorf("unable to read token from file %s: %w", fname, err)
+		}
+	}
+	return e.ValidateToken(data, constraints...)
+}
+
+func tokenFilename() string {
+	if f, ok := os.LookupEnv("BEARER_TOKEN_FILE"); ok {
+		return f
+	}
+	if d, ok := os.LookupEnv("XDG_RUNTIME_DIR"); ok {
+		f := filepath.Join(d, fmt.Sprintf("/bt_u%d", os.Getuid()))
+		if _, err := os.Stat(f); err == nil {
+			return f
+		}
+	}
+	f := filepath.Join(os.TempDir(), fmt.Sprintf("/bt_u%d", os.Getuid()))
+	if _, err := os.Stat(f); err == nil {
+		return f
+	}
+	return ""
 }
 
 // Validate checks that the SciToken is valid and meets all constraints imposed

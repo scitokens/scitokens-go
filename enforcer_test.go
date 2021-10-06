@@ -3,9 +3,12 @@ package scitokens
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/lestrrat-go/jwx/jwt"
@@ -238,4 +241,125 @@ func TestEnforcer(t *testing.T) {
 		_, err = enf.ValidateTokenRequest(r)
 		assert.NoError(err, "ValidateTokenRequest should succeed")
 	})
+
+	t.Run("validate token from environment", func(t *testing.T) {
+		enf, err := NewEnforcer(ctx, ts.URL)
+		if !assert.NoError(err, "NewEnforcer should succeed") {
+			return
+		}
+
+		resetEnv := clearEnv("BEARER_TOKEN", "BEARER_TOKEN_FILE", "XDG_RUNTIME_DIR", "TMPDIR")
+		defer resetEnv()
+
+		_, err = enf.ValidateTokenEnvironment()
+		assert.ErrorIs(err, TokenNotFoundError, "ValidateTokenEnvironment should return TokenNotFoundError")
+
+		if !assert.NoError(os.Setenv("BEARER_TOKEN", string(nt1))) {
+			return
+		}
+		_, err = enf.ValidateTokenEnvironment()
+		assert.Error(err, "ValidateTokenEnvironment should fail for invalid token")
+
+		if !assert.NoError(os.Setenv("BEARER_TOKEN", string(nt2))) {
+			return
+		}
+		_, err = enf.ValidateTokenEnvironment()
+		assert.Error(err, "ValidateTokenEnvironment should fail for token with invalid scope")
+
+		if !assert.NoError(os.Setenv("BEARER_TOKEN", string(t1))) {
+			return
+		}
+		_, err = enf.ValidateTokenEnvironment()
+		assert.NoError(err, "ValidateTokenEnvironment should succeed for BEARER_TOKEN var")
+		os.Unsetenv("BEARER_TOKEN")
+
+		// create temporary directory to use for token files
+		dir, err := os.MkdirTemp("", "scitokentest")
+		if !assert.NoError(err, "MkdirTemp should succeed") {
+			return
+		}
+		defer os.RemoveAll(dir)
+
+		file := filepath.Join(dir, fmt.Sprintf("/bt_u%d", os.Getuid()))
+		if !assert.NoError(os.WriteFile(file, t1, 0600), "WriteFile should succeed") {
+			return
+		}
+
+		os.Setenv("BEARER_TOKEN_FILE", file)
+		_, err = enf.ValidateTokenEnvironment()
+		assert.NoError(err, "ValidateTokenEnvironment should succeed for BEARER_TOKEN_FILE var")
+		os.Unsetenv("BEARER_TOKEN_FILE")
+
+		os.Setenv("XDG_RUNTIME_DIR", dir)
+		_, err = enf.ValidateTokenEnvironment()
+		assert.NoError(err, "ValidateTokenEnvironment should succeed for XDG_RUNTIME_DIR var")
+		os.Unsetenv("XDG_RUNTIME_DIR")
+
+		os.Setenv("TMPDIR", dir)
+		_, err = enf.ValidateTokenEnvironment()
+		assert.NoError(err, "ValidateTokenEnvironment should succeed for TMPDIR var")
+		os.Unsetenv("TMPDIR")
+
+		// create unreadable file to test error handling
+		if !assert.NoError(os.Remove(file), "Remove should succeed") {
+			return
+		}
+		if !assert.NoError(os.WriteFile(file, t1, 0000), "WriteFile should succeed") {
+			return
+		}
+		os.Setenv("BEARER_TOKEN_FILE", file)
+		_, err = enf.ValidateTokenEnvironment()
+		assert.Error(err, "ValidateTokenEnvironment should fail for unreadable token file")
+		os.Unsetenv("BEARER_TOKEN_FILE")
+	})
+}
+
+// clearEnv clears the given env vars, and returns a function that will reset
+// them to their current values (if set).
+func clearEnv(vars ...string) func() {
+	origin := make(map[string]string, len(vars))
+	for _, k := range vars {
+		if v, ok := os.LookupEnv(k); ok {
+			origin[k] = v
+			os.Unsetenv(k)
+		}
+	}
+	return func() {
+		for k, v := range origin {
+			os.Setenv(k, v)
+		}
+	}
+}
+
+func TestClearEnv(t *testing.T) {
+	testvars := []string{"CLEARENV_TEST1", "CLEARENV_TEST2", "CLEARENV_TEST3"}
+	for _, v := range testvars {
+		if _, ok := os.LookupEnv(v); ok {
+			t.Errorf("env var %s already set, won't continue", v)
+			return
+		}
+		os.Setenv(v, "foo")
+	}
+	// verify that they're set
+	for _, v := range testvars {
+		_, ok := os.LookupEnv(v)
+		assert.True(t, ok)
+	}
+
+	// clear and verify
+	f := clearEnv(testvars...)
+	for _, v := range testvars {
+		_, ok := os.LookupEnv(v)
+		assert.False(t, ok)
+	}
+
+	// reset and verify
+	f()
+	for _, v := range testvars {
+		_, ok := os.LookupEnv(v)
+		assert.True(t, ok)
+	}
+
+	// clean up
+	clearEnv(testvars...)
 }
