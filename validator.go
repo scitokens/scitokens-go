@@ -34,7 +34,7 @@ func (v scopeValidator) Validate(ctx context.Context, t jwt.Token) error {
 			return nil
 		}
 	}
-	return &TokenValidationError{fmt.Errorf("missing the following scope: %s", v.scope)}
+	return fmt.Errorf("missing the following scope: %s", v.scope)
 }
 
 type groupValidator struct {
@@ -57,5 +57,5 @@ func (v groupValidator) Validate(ctx context.Context, t jwt.Token) error {
 			return nil
 		}
 	}
-	return &TokenValidationError{fmt.Errorf("missing the following group: %s", v.group)}
+	return fmt.Errorf("missing the following group: %s", v.group)
 }
