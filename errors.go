@@ -11,19 +11,9 @@ var (
 	UntrustedIssuerError   = errors.New("issuer not trusted")
 	NotSciTokenError       = errors.New("token is not a SciToken")
 	TokenNotFoundError     = errors.New("token not found")
+	ScopeParseError        = errors.New("unable to unmarshal and parse scope claim")
+	GroupParseError        = errors.New("unable to unmarshal wlcg.groups claim")
 )
-
-type TokenParseError struct {
-	Err error
-}
-
-func (e *TokenParseError) Error() string {
-	return fmt.Sprintf("error while parsing token: %s", e.Err)
-}
-
-func (e *TokenParseError) Unwrap() error {
-	return e.Err
-}
 
 type TokenValidationError struct {
 	Err error

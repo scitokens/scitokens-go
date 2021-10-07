@@ -81,17 +81,14 @@ func (e *Enforcer) parseOptions() []jwt.ParseOption {
 // WithGroup, etc.
 //
 // The token is returned and can be re-validated with Validate().
-//
-// TODO: maybe these should just parse and do basic validation, and we
-// require a call to Validate() to check more constraints?
 func (e *Enforcer) ValidateToken(token []byte, constraints ...Validator) (SciToken, error) {
 	t, err := jwt.Parse(token, e.parseOptions()...)
 	if err != nil {
-		return nil, &TokenParseError{err}
+		return nil, err
 	}
 	st, err := NewSciToken(t)
 	if err != nil {
-		return nil, &TokenParseError{err}
+		return nil, err
 	}
 	return st, e.Validate(st, constraints...)
 }
@@ -102,11 +99,11 @@ func (e *Enforcer) ValidateToken(token []byte, constraints ...Validator) (SciTok
 func (e *Enforcer) ValidateTokenString(tokenstring string, constraints ...Validator) (SciToken, error) {
 	t, err := jwt.ParseString(tokenstring, e.parseOptions()...)
 	if err != nil {
-		return nil, &TokenParseError{err}
+		return nil, err
 	}
 	st, err := NewSciToken(t)
 	if err != nil {
-		return nil, &TokenParseError{err}
+		return nil, err
 	}
 	return st, e.Validate(st, constraints...)
 }
@@ -117,11 +114,11 @@ func (e *Enforcer) ValidateTokenString(tokenstring string, constraints ...Valida
 func (e *Enforcer) ValidateTokenReader(r io.Reader, constraints ...Validator) (SciToken, error) {
 	t, err := jwt.ParseReader(r, e.parseOptions()...)
 	if err != nil {
-		return nil, &TokenParseError{err}
+		return nil, err
 	}
 	st, err := NewSciToken(t)
 	if err != nil {
-		return nil, &TokenParseError{err}
+		return nil, err
 	}
 	return st, e.Validate(st, constraints...)
 }
@@ -132,11 +129,11 @@ func (e *Enforcer) ValidateTokenReader(r io.Reader, constraints ...Validator) (S
 func (e *Enforcer) ValidateTokenForm(values url.Values, name string, constraints ...Validator) (SciToken, error) {
 	t, err := jwt.ParseForm(values, name, e.parseOptions()...)
 	if err != nil {
-		return nil, &TokenParseError{err}
+		return nil, err
 	}
 	st, err := NewSciToken(t)
 	if err != nil {
-		return nil, &TokenParseError{err}
+		return nil, err
 	}
 	return st, e.Validate(st, constraints...)
 }
@@ -147,11 +144,11 @@ func (e *Enforcer) ValidateTokenForm(values url.Values, name string, constraints
 func (e *Enforcer) ValidateTokenHeader(hdr http.Header, name string, constraints ...Validator) (SciToken, error) {
 	t, err := jwt.ParseHeader(hdr, name, e.parseOptions()...)
 	if err != nil {
-		return nil, &TokenParseError{err}
+		return nil, err
 	}
 	st, err := NewSciToken(t)
 	if err != nil {
-		return nil, &TokenParseError{err}
+		return nil, err
 	}
 	return st, e.Validate(st, constraints...)
 }
@@ -162,11 +159,11 @@ func (e *Enforcer) ValidateTokenHeader(hdr http.Header, name string, constraints
 func (e *Enforcer) ValidateTokenRequest(r *http.Request, constraints ...Validator) (SciToken, error) {
 	t, err := jwt.ParseRequest(r, e.parseOptions()...)
 	if err != nil {
-		return nil, &TokenParseError{err}
+		return nil, err
 	}
 	st, err := NewSciToken(t)
 	if err != nil {
-		return nil, &TokenParseError{err}
+		return nil, err
 	}
 	return st, e.Validate(st, constraints...)
 }

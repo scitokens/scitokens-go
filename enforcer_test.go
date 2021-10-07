@@ -45,22 +45,22 @@ func TestEnforcer(t *testing.T) {
 	})
 
 	// generate a few tokens with different capabilities
-	// TODO probably a better way to organize these and make sure they get used correctly.
-
-	// invalid tokens
-	nt1 := []byte("not a token")
-	nt2, err := srv.MakeToken(ts.URL, 0, nil)
+	invalidTokens := make([][]byte, 4)
+	invalidTokens[0] = []byte("not a token")
+	invalidTokens[1], err = srv.MakeToken(ts.URL, 0, nil)
 	if !assert.NoError(err) {
 		return
 	}
-	nt3, err := srv.MakeToken(ts.URL, nil, 0)
+	invalidTokens[2], err = srv.MakeToken(ts.URL, nil, 0)
 	if !assert.NoError(err) {
 		return
 	}
-	nt4, err := srv.MakeToken("https://example.com", nil, nil)
+	// we explicitely test this token's validation error
+	invalidIssuerToken, err := srv.MakeToken("https://example.com", nil, nil)
 	if !assert.NoError(err) {
 		return
 	}
+	invalidTokens[3] = invalidIssuerToken
 
 	// valid tokens
 	t1, err := srv.MakeToken(ts.URL, nil, nil)
@@ -86,30 +86,25 @@ func TestEnforcer(t *testing.T) {
 			return
 		}
 
-		_, err = enf.ValidateToken(nt1)
-		assert.EqualError(err, "error while parsing token: failed to parse token: invalid character 'o' in literal null (expecting 'u')")
+		for _, nt := range invalidTokens {
+			_, err = enf.ValidateToken(nt)
+			assert.Error(err)
+		}
 
-		_, err = enf.ValidateToken(nt2)
-		assert.EqualError(err, "error while parsing token: unable to cast scopes claim to string")
-
-		_, err = enf.ValidateToken(nt3)
-		assert.EqualError(err, "error while parsing token: unable to cast wlcg.groups claim to slice")
-
-		_, err = enf.ValidateToken(nt4)
-		assert.ErrorIs(err, UntrustedIssuerError)
-
-		// we have to go around the enforcer parsing to check the logic in Validate
-		jnt4, err := jwt.Parse(nt4)
+		// we have to go around the enforcer parsing to check the error handling in Validate
+		// this also lets us test error types and wrapping explicitely
+		jt, err := jwt.Parse(invalidIssuerToken)
 		if !assert.NoError(err) {
 			return
 		}
-		snt4, err := NewSciToken(jnt4)
+		st, err := NewSciToken(jt)
 		if !assert.NoError(err) {
 			return
 		}
-		err = enf.Validate(snt4)
+		err = enf.Validate(st)
+		e := &TokenValidationError{}
+		assert.ErrorAs(err, &e)
 		assert.ErrorIs(err, UntrustedIssuerError)
-		assert.EqualError(err, "token invalid: issuer not trusted")
 
 		st1, err := enf.ValidateToken(t1)
 		assert.NoError(err, "ValidateToken should succeed for token with no scopes or groups")
@@ -150,11 +145,11 @@ func TestEnforcer(t *testing.T) {
 		if !assert.NoError(err, "NewEnforcer should succeed") {
 			return
 		}
-		_, err = enf.ValidateTokenString(string(nt1))
-		assert.Error(err, "ValidateTokenString should fail for invalid token")
 
-		_, err = enf.ValidateTokenString(string(nt2))
-		assert.Error(err, "ValidateTokenString should fail for token with invalid scope")
+		for _, nt := range invalidTokens {
+			_, err = enf.ValidateTokenString(string(nt))
+			assert.Error(err)
+		}
 
 		_, err = enf.ValidateTokenString(string(t1))
 		assert.NoError(err, "ValidateTokenString should succeed")
@@ -165,13 +160,13 @@ func TestEnforcer(t *testing.T) {
 		if !assert.NoError(err, "NewEnforcer should succeed") {
 			return
 		}
-		r := bytes.NewReader(nt1)
-		_, err = enf.ValidateTokenReader(r)
-		assert.Error(err, "ValidateTokenReader should fail for invalid token")
 
-		r.Reset(nt2)
-		_, err = enf.ValidateTokenReader(r)
-		assert.Error(err, "ValidateTokenReader should fail for token with invalid scope")
+		r := &bytes.Reader{}
+		for _, nt := range invalidTokens {
+			r.Reset(nt)
+			_, err = enf.ValidateTokenReader(r)
+			assert.Error(err)
+		}
 
 		r.Reset(t1)
 		_, err = enf.ValidateTokenReader(r)
@@ -184,13 +179,11 @@ func TestEnforcer(t *testing.T) {
 			return
 		}
 		v := url.Values{}
-		v.Add("token", string(nt1))
-		_, err = enf.ValidateTokenForm(v, "token")
-		assert.Error(err, "ValidateTokenForm should fail for invalid token")
-
-		v.Set("token", string(nt2))
-		_, err = enf.ValidateTokenForm(v, "token")
-		assert.Error(err, "ValidateTokenForm should fail for token with invalid scope")
+		for _, nt := range invalidTokens {
+			v.Set("token", string(nt))
+			_, err = enf.ValidateTokenForm(v, "token")
+			assert.Error(err)
+		}
 
 		v.Set("token", string(t1))
 		_, err = enf.ValidateTokenForm(v, "token")
@@ -203,18 +196,16 @@ func TestEnforcer(t *testing.T) {
 			return
 		}
 		h := http.Header{}
-		h.Add("X-SciToken", string(nt1))
-		_, err = enf.ValidateTokenHeader(h, "X-SciToken")
-		assert.Error(err, "ValidateTokenHeader should fail for invalid token")
-
-		h.Set("X-SciToken", string(nt2))
-		_, err = enf.ValidateTokenHeader(h, "X-SciToken")
-		assert.Error(err, "ValidateTokenHeader should fail for token with invalid scope")
+		for _, nt := range invalidTokens {
+			h.Set("X-SciToken", string(nt))
+			_, err = enf.ValidateTokenHeader(h, "X-SciToken")
+			assert.Error(err)
+		}
 
 		h.Set("X-SciToken", string(t1))
 		// For the header "Authorization", it will strip the prefix "Bearer "
 		// and will treat the remaining value as a JWT.
-		h.Add("Authorization", "Bearer "+string(t1))
+		h.Set("Authorization", "Bearer "+string(t1))
 
 		_, err = enf.ValidateTokenHeader(h, "X-SciToken")
 		assert.NoError(err, "ValidateTokenHeader should succeed for X-SciToken header")
@@ -229,13 +220,11 @@ func TestEnforcer(t *testing.T) {
 			return
 		}
 		r := httptest.NewRequest("GET", "https://example.com/foo", nil)
-		r.Header.Add("Authorization", "Bearer "+string(nt1))
-		_, err = enf.ValidateTokenRequest(r)
-		assert.Error(err, "ValidateTokenRequest should fail for invalid token")
-
-		r.Header.Set("Authorization", "Bearer "+string(nt2))
-		_, err = enf.ValidateTokenRequest(r)
-		assert.Error(err, "ValidateTokenRequest should fail for token with invalid scope")
+		for _, nt := range invalidTokens {
+			r.Header.Set("Authorization", "Bearer "+string(nt))
+			_, err = enf.ValidateTokenRequest(r)
+			assert.Error(err)
+		}
 
 		r.Header.Set("Authorization", "Bearer "+string(t1))
 		_, err = enf.ValidateTokenRequest(r)
@@ -254,17 +243,13 @@ func TestEnforcer(t *testing.T) {
 		_, err = enf.ValidateTokenEnvironment()
 		assert.ErrorIs(err, TokenNotFoundError, "ValidateTokenEnvironment should return TokenNotFoundError")
 
-		if !assert.NoError(os.Setenv("BEARER_TOKEN", string(nt1))) {
-			return
+		for _, nt := range invalidTokens {
+			if !assert.NoError(os.Setenv("BEARER_TOKEN", string(nt))) {
+				return
+			}
+			_, err = enf.ValidateTokenEnvironment()
+			assert.Error(err)
 		}
-		_, err = enf.ValidateTokenEnvironment()
-		assert.Error(err, "ValidateTokenEnvironment should fail for invalid token")
-
-		if !assert.NoError(os.Setenv("BEARER_TOKEN", string(nt2))) {
-			return
-		}
-		_, err = enf.ValidateTokenEnvironment()
-		assert.Error(err, "ValidateTokenEnvironment should fail for token with invalid scope")
 
 		if !assert.NoError(os.Setenv("BEARER_TOKEN", string(t1))) {
 			return

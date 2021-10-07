@@ -22,6 +22,8 @@ func PrintToken(w io.Writer, t jwt.Token) {
 
 // GetScopes parses the scope claim and returns a list of all scopes, or an
 // empty list if the scope claim is missing.
+//
+// Returns ScopeParseError if the scope claim cannot be unmarshaled or parsed.
 func GetScopes(t jwt.Token) ([]Scope, error) {
 	scopeint, ok := t.Get("scope")
 	if !ok {
@@ -29,7 +31,7 @@ func GetScopes(t jwt.Token) ([]Scope, error) {
 	}
 	scopestr, ok := scopeint.(string)
 	if !ok {
-		return nil, fmt.Errorf("unable to cast scopes claim to string")
+		return nil, ScopeParseError
 	}
 	scopestrs := strings.Split(scopestr, " ")
 	scopes := make([]Scope, len(scopestrs))
@@ -41,6 +43,8 @@ func GetScopes(t jwt.Token) ([]Scope, error) {
 
 // GetGroups parses the wlcg.groups claim and returns a list of all groups, or
 // an empty list if the wlcg.groups claim is missing.
+//
+// Returns GroupParseError if the wlcg.groups claim cannot be unmarshaled.
 func GetGroups(t jwt.Token) ([]string, error) {
 	groupint, ok := t.Get("wlcg.groups")
 	if !ok {
@@ -48,13 +52,13 @@ func GetGroups(t jwt.Token) ([]string, error) {
 	}
 	groupints, ok := groupint.([]interface{})
 	if !ok {
-		return nil, fmt.Errorf("unable to cast wlcg.groups claim to slice")
+		return nil, GroupParseError
 	}
 	groups := make([]string, len(groupints))
 	for i, g := range groupints {
 		gs, ok := g.(string)
 		if !ok {
-			return nil, fmt.Errorf("unable to cast wlcg.group \"%v\" to string", g)
+			return nil, GroupParseError
 		}
 		groups[i] = gs
 	}
