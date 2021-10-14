@@ -15,6 +15,14 @@ To fetch and add the library to your Go project dependencies, run:
 
     go get github.com/scitokens/scitokens-go
 
+Then import it in your source:
+
+``` go
+import (
+	scitokens "github.com/scitokens/scitokens-go"
+)
+```
+
 ### Parsing SciTokens
 
 Note: if you're only interested in validating tokens in a service, you can skip
@@ -38,7 +46,7 @@ func PrintSciToken(tok []byte) error {
 	if err != nil {
 		return err
 	}
-	st, err := NewSciToken(jt)
+	st, err := scitokens.NewSciToken(jt)
 	if err != nil {
 		return err
 	}
@@ -112,7 +120,9 @@ also possible to pass additional request-specific validation criteria to the
 `ValidateToken...` functions.
 
 ``` go
-if _, err := enf.ValidateToken(tok, scitokens.WithGroup("cms/production")); err != nil {
+if _, err := enf.ValidateToken(tok, scitokens.WithGroup("cms/production")); err == nil {
+	doRequest()
+} else {
 	e := &scitokens.TokenValidationError{}
 	if !errors.As(err, &e) {
 		// some internal error while parsing/validating the token
@@ -122,8 +132,6 @@ if _, err := enf.ValidateToken(tok, scitokens.WithGroup("cms/production")); err 
 		log.Debugf("access dened: %v", err)
 	}
 	denyRequest(err)
-} else {
-	doRequest()
 }
 ```
 
@@ -138,12 +146,12 @@ directly or passed to
 to test different criteria.
 
 ``` go
-if st, err := enf.ValidateToken(tok, scitokens.WithGroup("cms/production")); err != nil {
+if st, err := enf.ValidateToken(tok, scitokens.WithGroup("cms/production")); err == nil {
+	doRequest()
+} else {
 	if enf.Validate(st, scitokens.WithGroup("cms/operations")) {
 		doRequest()
 	}
 	denyRequest(err)
-} else {
-	doRequest()
 }
 ```
