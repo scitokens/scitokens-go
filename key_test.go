@@ -292,7 +292,7 @@ func TestIssuerKeyManager(t *testing.T) {
 	defer cancel()
 
 	t.Run("IssuerKeyManager not initialized", func(t *testing.T) {
-		ikm := IssuerKeyManager{}
+		ikm := IssuerKeyRefresher{}
 		err := ikm.AddIssuer(ctx, "https://example.com")
 		assert.Error(err)
 		assert.ErrorIs(err, IKMNotInitializedError)
@@ -307,17 +307,19 @@ func TestIssuerKeyManager(t *testing.T) {
 	})
 
 	ikm := NewIssuerKeyManager(ctx)
-	assert.Equal(ikm.issuerKeyURLs, map[string]string{})
-	assert.IsType(jwk.NewAutoRefresh(ctx), ikm.keysets)
+	ikr, ok := ikm.(*IssuerKeyRefresher)
+	assert.True(ok, "NewIssuerKeyManager should return an IssuerKeyRefresher")
+	assert.Equal(ikr.issuerKeyURLs, map[string]string{})
+	assert.IsType(jwk.NewAutoRefresh(ctx), ikr.keysets)
 
 	assert.Error(ikm.AddIssuer(ctx, "foo://bar/baz"), "adding bad issuer should fail")
-	assert.Equal(ikm.issuerKeyURLs, map[string]string{}, "bad issuer shouldn't have been added")
+	assert.Equal(ikr.issuerKeyURLs, map[string]string{}, "bad issuer shouldn't have been added")
 
 	t.Run("add issuer", func(t *testing.T) {
 		if !assert.NoError(ikm.AddIssuer(ctx, ts.URL)) {
 			return
 		}
-		u, ok := ikm.issuerKeyURLs[ts.URL]
+		u, ok := ikr.issuerKeyURLs[ts.URL]
 		assert.True(ok, "issuer should have been added")
 		if !assert.Equal(u, ts.URL+"/jwk", "JWK URL should be set") {
 			return

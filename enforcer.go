@@ -32,7 +32,7 @@ type Enforcer interface {
 
 type stdEnforcer struct {
 	issuers    map[string]bool
-	ikm        *IssuerKeyManager
+	ikm        IssuerKeyManager
 	validators []Validator
 }
 
