@@ -146,12 +146,12 @@ directly or passed to
 to test different criteria.
 
 ``` go
+// request is valid if token has either /cms/production or /cms/operations group
 if st, err := enf.ValidateToken(tok, scitokens.WithGroup("cms/production")); err == nil {
 	doRequest()
+} else if enf.Validate(st, scitokens.WithGroup("cms/operations")) == nil {
+	doRequest()
 } else {
-	if enf.Validate(st, scitokens.WithGroup("cms/operations")) {
-		doRequest()
-	}
 	denyRequest(err)
 }
 ```
