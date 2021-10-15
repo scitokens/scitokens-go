@@ -9,18 +9,33 @@ import (
 )
 
 type testToken struct {
-	Name    string
-	Data    []byte
-	Subject string
-	Issuer  string
-	Scopes  []Scope
-	Groups  []string
+	Name     string
+	Data     []byte
+	Subject  string
+	Issuer   string
+	Scopes   []Scope
+	Groups   []string
+	Version  string
+	Audience []string
 }
 
 var (
 	// It goes without saying, but I'll say it anyways:
 	// EXPIRED TOKENS ONLY
 	testTokens = []testToken{
+		{
+			Name:    "bare SciToken",
+			Data:    []byte("eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiYm9ja2VsbSIsImV4cCI6MTUwOTk5MTc5MCwiaXNzIjoiaHR0cHM6Ly9zY2l0b2tlbnMub3JnL2NtcyIsImlhdCI6MTUwOTk4ODE5MCwic2NvcGUiOiJyZWFkOi9zdG9yZSB3cml0ZTovc3RvcmUvdXNlci9iYm9ja2VsbSIsIm5iZiI6MTUwOTk4ODE5MCwidmVyIjoic2NpdG9rZW46Mi4wIiwiYXVkIjoiaHR0cHM6Ly9jbXMuZXhhbXBsZS5jb20ifQ.fCtyZQQNPaowQ5FXFVIlbt2Qpb4ui8Bkl1qXpwLKI3FQ0AKP64Ozf7NLKI8nRHaAqh9XRQAxB9YtAJAeHriSN422-CraARoYyBdrZMtwlxphOLPkpuxbIusVYB3r4zIRt4BoB7NlqLqwVV2e5rGtkJGvi9tpY2FNr7eZ6eBrzAg"),
+			Subject: "bbockelm",
+			Issuer:  "https://scitokens.org/cms",
+			Scopes: []Scope{
+				{"read", "/store"},
+				{"write", "/store/user/bbockelm"},
+			},
+			Groups:   []string{},
+			Version:  "scitoken:2.0",
+			Audience: []string{"https://transfer-server.example.com"},
+		},
 		{
 			Name:    "WLCG test issuer",
 			Data:    []byte(`eyJraWQiOiJyc2ExIiwiYWxnIjoiUlMyNTYifQ.eyJ3bGNnLnZlciI6IjEuMCIsInN1YiI6ImM3NWMzMmNiLTU0ZGUtNDY2MC04NjVjLTFkNWM4NjlkMGQ3YSIsImF1ZCI6Imh0dHBzOlwvXC93bGNnLmNlcm4uY2hcL2p3dFwvdjFcL2FueSIsIm5iZiI6MTYzMzEyMTE1OCwic2NvcGUiOiJvcGVuaWQgcHJvZmlsZSBvZmZsaW5lX2FjY2VzcyBlbWFpbCB3bGNnIHdsY2cuZ3JvdXBzIiwiaXNzIjoiaHR0cHM6XC9cL3dsY2cuY2xvdWQuY25hZi5pbmZuLml0XC8iLCJleHAiOjE2MzMxMjQ3NTgsImlhdCI6MTYzMzEyMTE1OCwianRpIjoiOWU4OGFmNzAtZGIxMi00NWRlLWEwZTMtZDc3YTA0OTNhNzM0IiwiY2xpZW50X2lkIjoiY2Q1NjIzZTMtMTZkYS00MTU2LWEzNWYtYzBiOWU0MTkwZTA0Iiwid2xjZy5ncm91cHMiOlsiXC93bGNnIl19.dlz0VLighqFIyQ6wRk8kehRACfVnqSxRfZrAAaqneFgNCfhbGY65ZaAgCPHl2avfqRumYOqHr9PTbQLFp9bx6CV_Oa7kWguGOo2Dm59aoGO_XrlvhtGYJ3uxYUN6jQ8ZyQYaR8fgJmC3m1S_sVu56yg0HMC1jfFhCWec-cyes80`),
@@ -34,7 +49,9 @@ var (
 				{"wlcg", ""},
 				{"wlcg.groups", ""},
 			},
-			Groups: []string{"/wlcg"},
+			Groups:   []string{"/wlcg"},
+			Version:  "wlcg:1.0",
+			Audience: []string{"https://wlcg.cern.ch/jwt/v1/any"},
 		},
 	}
 )
@@ -141,6 +158,8 @@ func TestNewSciToken(t *testing.T) {
 				assert.Equal(st.Issuer(), tok.Issuer)
 				assert.Equal(st.Scopes(), tok.Scopes)
 				assert.Equal(st.Groups(), tok.Groups)
+				assert.Equal(st.Version(), tok.Version)
+				assert.Equal(st.Audience(), tok.Audience)
 			})
 		}
 	})

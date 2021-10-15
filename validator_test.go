@@ -66,3 +66,29 @@ func TestGroupValidator(t *testing.T) {
 	v = WithGroup("foo/bar")
 	assert.Error(v.Validate(ctx, st1), "token does not have sub-group foo/bar")
 }
+
+func TestAudienceValidator(t *testing.T) {
+	assert := assert.New(t)
+	ctx := context.Background()
+
+	t1 := jwt.New()
+	t1.Set("ver", "scitoken:2.0")
+	t1.Set("aud", "foo")
+	st1, err := NewSciToken(t1)
+	if !assert.NoError(err) {
+		return
+	}
+
+	v := WithAudience("foo")
+	assert.ErrorIs(v.Validate(ctx, t1), NotSciTokenError, "cannot validate non-SciToken")
+	assert.NoError(v.Validate(ctx, st1), "token has audience foo")
+
+	v = WithGroup("foo")
+	assert.NoError(v.Validate(ctx, st1), "leading slash is optional")
+
+	v = WithGroup("bar")
+	assert.Error(v.Validate(ctx, st1), "token does not have group bar")
+
+	v = WithGroup("foo/bar")
+	assert.Error(v.Validate(ctx, st1), "token does not have sub-group foo/bar")
+}

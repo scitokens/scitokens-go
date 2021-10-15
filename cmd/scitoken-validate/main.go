@@ -18,6 +18,8 @@ var (
 		"scope to validate, with optional path delimited by colon. Can be repeated.")
 	groups *[]string = flag.StringSliceP("group", "g", []string{},
 		"WLCG group to validate. The leading slash on the group name is optional. Can be repeated.")
+	audiences *string = flag.StringSliceP("audience", "a", []string{},
+		"audience to validate (or any). Can be repeated.")
 	verbose *bool = flag.BoolP("verbose", "v", false,
 		"extra logging of token information and internals to stderr.")
 )
@@ -38,6 +40,9 @@ scope paths will validate sub-paths (see example).
 
 Optionally pass one or more WLCG groups to require with the --group/-g flag. Note
 that groups WILL NOT validate sub-groups (see example).
+
+Optionally pass one or more audiences to require with the --audience/-a flag.
+This will also validate if the token has one of the special "any" audiences.
 
 If the token is not valid an explanation message will be printed to stderr and
 the program will terminate with exit code 1.
