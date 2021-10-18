@@ -17,7 +17,6 @@ func TestPrintToken(t *testing.T) {
 	t1.Set("sub", "my-subject")
 	t1.Set("iss", "my-issuer")
 	t1.Set("aud", []string{"my-audience"})
-	t1.Set("foo", "bar")
 	PrintToken(&buf, t1)
 	ref := `Token version: scitoken:1.0, ID: my-id
 Subject: my-subject
@@ -26,7 +25,6 @@ Audience: [my-audience]
 Issued at: 0001-01-01 00:00:00 +0000 UTC, Valid after: 0001-01-01 00:00:00 +0000 UTC, Expires at: 0001-01-01 00:00:00 +0000 UTC
 Claims:
 	ver: scitoken:1.0
-	foo: bar
 `
 	assert.Equal(ref, buf.String())
 }
