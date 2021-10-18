@@ -79,16 +79,21 @@ func TestAudienceValidator(t *testing.T) {
 		return
 	}
 
-	v := WithAudience("foo")
+	v := WithAudience("bar")
 	assert.ErrorIs(v.Validate(ctx, t1), NotSciTokenError, "cannot validate non-SciToken")
-	assert.NoError(v.Validate(ctx, st1), "token has audience foo")
+	assert.Error(v.Validate(ctx, st1), "token does not have required audience")
 
-	v = WithGroup("foo")
-	assert.NoError(v.Validate(ctx, st1), "leading slash is optional")
+	assert.NoError(t1.Set("aud", "bar"))
+	assert.NoError(v.Validate(ctx, st1), "token has required audience")
 
-	v = WithGroup("bar")
-	assert.Error(v.Validate(ctx, st1), "token does not have group bar")
+	assert.NoError(st1.Remove("aud"))
+	assert.Error(v.Validate(ctx, st1), "audience is mandatory for scitoken v2.0")
+	assert.NoError(st1.Set("ver", "scitoken:1.0"))
+	assert.NoError(v.Validate(ctx, st1), "audience is not mandatory for scitoken v1.0")
 
-	v = WithGroup("foo/bar")
-	assert.Error(v.Validate(ctx, st1), "token does not have sub-group foo/bar")
+	assert.NoError(st1.Set("ver", "scitoken:2.0"))
+	for _, any := range AnyAudiences {
+		assert.NoError(st1.Set("aud", any))
+		assert.NoErrorf(v.Validate(ctx, st1), "%s audience allows use for any audience", any)
+	}
 }

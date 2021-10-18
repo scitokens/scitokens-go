@@ -81,13 +81,14 @@ func WithAudience(audience string) Validator {
 }
 
 func (v audienceValidator) Validate(ctx context.Context, t jwt.Token) error {
-	ver, err := GetVersion(t)
-	if err != nil {
-		return err
+	st, ok := t.(SciToken)
+	if !ok {
+		return NotSciTokenError
 	}
 
-	auds := t.Audience()
+	auds := st.Audience()
 	if len(auds) == 0 {
+		ver := st.Version()
 		// The aud claim is OPTIONAL in scitoken version 1.0, mandatory in 2.0
 		// and WLCG profile tokens.
 		if ver == "" || ver == "scitoken:1.0" {
