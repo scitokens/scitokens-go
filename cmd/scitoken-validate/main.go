@@ -18,7 +18,7 @@ var (
 		"scope to validate, with optional path delimited by colon. Can be repeated.")
 	groups *[]string = flag.StringSliceP("group", "g", []string{},
 		"WLCG group to validate. The leading slash on the group name is optional. Can be repeated.")
-	audiences *string = flag.StringSliceP("audience", "a", []string{},
+	audiences *[]string = flag.StringSliceP("audience", "a", []string{},
 		"audience to validate (or any). Can be repeated.")
 	verbose *bool = flag.BoolP("verbose", "v", false,
 		"extra logging of token information and internals to stderr.")
@@ -84,6 +84,9 @@ func main() {
 	// Validation constraints can be added to the base Enforcer...
 	for _, s := range *scopes {
 		enf.RequireScope(scitoken.ParseScope(s))
+	}
+	for _, a := range *audiences {
+		enf.RequireAudience(a)
 	}
 
 	// ... or added on at parse time.
