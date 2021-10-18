@@ -130,6 +130,24 @@ func TestNewSciToken(t *testing.T) {
 		_, err := NewSciToken(t1)
 		assert.Error(err, "NewSciToken should fail")
 	})
+	t.Run("SciToken with invalid audience", func(t *testing.T) {
+		assert := assert.New(t)
+		t1 := jwt.New()
+		st1, err := NewSciToken(t1)
+		if !assert.NoError(err, "NewSciToken should succeed") {
+			return
+		}
+		assert.Error(st1.Set("aud", 0), "setting aud should fail")
+	})
+	t.Run("SciToken with invalid version", func(t *testing.T) {
+		assert := assert.New(t)
+		t1 := jwt.New()
+		if !assert.NoError(t1.Set("ver", 0), "setting ver should succeed") {
+			return
+		}
+		_, err := NewSciToken(t1)
+		assert.Error(err, "NewSciToken should fail")
+	})
 	t.Run("Parsed SciTokens", func(t *testing.T) {
 		assert := assert.New(t)
 		for _, tok := range testTokens {
