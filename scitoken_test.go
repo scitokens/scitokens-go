@@ -1,12 +1,79 @@
 package scitokens
 
 import (
+	"context"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/lestrrat-go/jwx/jwt"
 	"github.com/stretchr/testify/assert"
 )
+
+// a token where everything that can go wrong, does
+type murphyToken struct{}
+
+var murphyError = errors.New("Murphy says no")
+
+func (t *murphyToken) Audience() []string {
+	return []string{}
+}
+
+func (t *murphyToken) Expiration() time.Time {
+	return time.Now()
+}
+
+func (t *murphyToken) IssuedAt() time.Time {
+	return time.Now()
+}
+
+func (t *murphyToken) Issuer() string {
+	return ""
+}
+
+func (t *murphyToken) JwtID() string {
+	return ""
+}
+
+func (t *murphyToken) NotBefore() time.Time {
+	return time.Now()
+}
+
+func (t *murphyToken) Subject() string {
+	return ""
+}
+
+func (t *murphyToken) PrivateClaims() map[string]interface{} {
+	return map[string]interface{}{}
+}
+
+func (t *murphyToken) Get(name string) (interface{}, bool) {
+	return nil, false
+}
+
+func (t *murphyToken) Set(name string, value interface{}) error {
+	return murphyError
+}
+
+func (t *murphyToken) Remove(name string) error {
+	return murphyError
+}
+
+func (t *murphyToken) Clone() (jwt.Token, error) {
+	return nil, murphyError
+}
+
+func (t *murphyToken) Iterate(ctx context.Context) jwt.Iterator {
+	return nil
+}
+
+func (t *murphyToken) Walk(ctx context.Context, v jwt.Visitor) error {
+	return murphyError
+}
+
+func (t *murphyToken) AsMap(ctx context.Context) (map[string]interface{}, error) {
+	return nil, murphyError
+}
 
 type testToken struct {
 	Name     string
@@ -89,6 +156,26 @@ func TestNewSciToken(t *testing.T) {
 			return
 		}
 		assert.Equal(st, st2)
+	})
+	t.Run("Murphy's token", func(t *testing.T) {
+		assert := assert.New(t)
+		t1 := &murphyToken{}
+		st1, err := NewSciToken(t1)
+		if !assert.NoError(err, "NewSciToken should succeed") {
+			return
+		}
+		if !assert.NotNil(st1, "SciToken should not be nil") {
+			return
+		}
+		assert.ErrorIs(st1.Set("foo", "bar"), murphyError)
+		assert.ErrorIs(st1.Remove("foo"), murphyError)
+		_, err = st1.Clone()
+		assert.ErrorIs(err, murphyError)
+		assert.Nil(st1.Iterate(context.Background()))
+		assert.ErrorIs(st1.Walk(context.Background(), nil), murphyError)
+		_, err = st1.AsMap(context.Background())
+		assert.ErrorIs(err, murphyError)
+
 	})
 	t.Run("SciToken with scope and groups", func(t *testing.T) {
 		assert := assert.New(t)
