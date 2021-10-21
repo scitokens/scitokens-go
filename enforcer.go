@@ -38,9 +38,24 @@ type stdEnforcer struct {
 }
 
 // NewEnforcer initializes a new enforcer for validating SciTokens from the
-// provided issuer(s). The context object should be cancelled when the process
-// is done with the enforcer.
-func NewEnforcer(ctx context.Context, issuers ...string) (Enforcer, error) {
+// provided issuer(s). Keys are fetched on-demand when a token is verified. Use
+// NewEnforcerDaemon() for long-running processes.
+func NewEnforcer(issuers ...string) (Enforcer, error) {
+	if len(issuers) == 0 {
+		return nil, errors.New("must accept at least one issuer")
+	}
+	e := &stdEnforcer{
+		issuers:    make(map[string]bool),
+		ikm:        NewIssuerKeyFetcher(issuers...),
+		validators: make([]Validator, 0),
+	}
+	return e, nil
+}
+
+// NewEnforcerDaemon initializes a new enforcer for validating SciTokens from
+// the provided issuer(s), caching and refreshing keys periodically. The context
+// object should be cancelled when the process is done with the enforcer.
+func NewEnforcerDaemon(ctx context.Context, issuers ...string) (Enforcer, error) {
 	if len(issuers) == 0 {
 		return nil, errors.New("must accept at least one issuer")
 	}

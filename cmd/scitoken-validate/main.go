@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -72,11 +71,7 @@ FLAGS
 }
 
 func main() {
-	// The Enforcer has some background processes, so we need a context to tell
-	// it to clean up before exiting.
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	enf, err := scitoken.NewEnforcer(ctx, *issuers...)
+	enf, err := scitoken.NewEnforcer(*issuers...)
 	if err != nil {
 		log.Fatalf("failed to initialize enforcer: %s", err)
 	}

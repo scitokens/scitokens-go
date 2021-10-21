@@ -29,14 +29,24 @@ func TestEnforcer(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("new enforcer", func(t *testing.T) {
-		_, err = NewEnforcer(ctx)
+		_, err = NewEnforcer()
 		assert.Error(err, "at least one issuer must be specified")
 
-		_, err = NewEnforcer(ctx, "https://example.com")
-		assert.Error(err, "NewEnforcer should fail for invalid issuer")
-
-		enf, err := NewEnforcer(ctx, ts.URL)
+		_, err := NewEnforcer(ts.URL)
 		if !assert.NoError(err, "NewEnforcer should succeed") {
+			return
+		}
+	})
+
+	t.Run("new enforcer daemon", func(t *testing.T) {
+		_, err = NewEnforcerDaemon(ctx)
+		assert.Error(err, "at least one issuer must be specified")
+
+		_, err = NewEnforcerDaemon(ctx, "https://example.com")
+		assert.Error(err, "NewEnforcerDaemon should fail for invalid issuer")
+
+		enf, err := NewEnforcerDaemon(ctx, ts.URL)
+		if !assert.NoError(err, "NewEnforcerDaemon should succeed") {
 			return
 		}
 
@@ -81,8 +91,8 @@ func TestEnforcer(t *testing.T) {
 	}
 
 	t.Run("validate token", func(t *testing.T) {
-		enf, err := NewEnforcer(ctx, ts.URL)
-		if !assert.NoError(err, "NewEnforcer should succeed") {
+		enf, err := NewEnforcerDaemon(ctx, ts.URL)
+		if !assert.NoError(err, "NewEnforcerDaemon should succeed") {
 			return
 		}
 
@@ -155,8 +165,8 @@ func TestEnforcer(t *testing.T) {
 	})
 
 	t.Run("validate token from string", func(t *testing.T) {
-		enf, err := NewEnforcer(ctx, ts.URL)
-		if !assert.NoError(err, "NewEnforcer should succeed") {
+		enf, err := NewEnforcerDaemon(ctx, ts.URL)
+		if !assert.NoError(err, "NewEnforcerDaemon should succeed") {
 			return
 		}
 
@@ -170,8 +180,8 @@ func TestEnforcer(t *testing.T) {
 	})
 
 	t.Run("validate token from Reader", func(t *testing.T) {
-		enf, err := NewEnforcer(ctx, ts.URL)
-		if !assert.NoError(err, "NewEnforcer should succeed") {
+		enf, err := NewEnforcerDaemon(ctx, ts.URL)
+		if !assert.NoError(err, "NewEnforcerDaemon should succeed") {
 			return
 		}
 
@@ -188,8 +198,8 @@ func TestEnforcer(t *testing.T) {
 	})
 
 	t.Run("validate token from form value", func(t *testing.T) {
-		enf, err := NewEnforcer(ctx, ts.URL)
-		if !assert.NoError(err, "NewEnforcer should succeed") {
+		enf, err := NewEnforcerDaemon(ctx, ts.URL)
+		if !assert.NoError(err, "NewEnforcerDaemon should succeed") {
 			return
 		}
 		v := url.Values{}
@@ -205,8 +215,8 @@ func TestEnforcer(t *testing.T) {
 	})
 
 	t.Run("validate token from header value", func(t *testing.T) {
-		enf, err := NewEnforcer(ctx, ts.URL)
-		if !assert.NoError(err, "NewEnforcer should succeed") {
+		enf, err := NewEnforcerDaemon(ctx, ts.URL)
+		if !assert.NoError(err, "NewEnforcerDaemon should succeed") {
 			return
 		}
 		h := http.Header{}
@@ -229,8 +239,8 @@ func TestEnforcer(t *testing.T) {
 	})
 
 	t.Run("validate token from http request", func(t *testing.T) {
-		enf, err := NewEnforcer(ctx, ts.URL)
-		if !assert.NoError(err, "NewEnforcer should succeed") {
+		enf, err := NewEnforcerDaemon(ctx, ts.URL)
+		if !assert.NoError(err, "NewEnforcerDaemon should succeed") {
 			return
 		}
 		r := httptest.NewRequest("GET", "https://example.com/foo", nil)
@@ -246,8 +256,8 @@ func TestEnforcer(t *testing.T) {
 	})
 
 	t.Run("validate token from environment", func(t *testing.T) {
-		enf, err := NewEnforcer(ctx, ts.URL)
-		if !assert.NoError(err, "NewEnforcer should succeed") {
+		enf, err := NewEnforcerDaemon(ctx, ts.URL)
+		if !assert.NoError(err, "NewEnforcerDaemon should succeed") {
 			return
 		}
 
