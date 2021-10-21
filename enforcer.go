@@ -17,6 +17,7 @@ import (
 // certain issuer, and that they allow the requested resource.
 type Enforcer interface {
 	AddIssuer(context.Context, string) error
+	RequireAudience(string) error
 	RequireScope(Scope) error
 	RequireGroup(string) error
 	RequireValidator(Validator) error
@@ -67,7 +68,7 @@ func (e *stdEnforcer) AddIssuer(ctx context.Context, issuer string) error {
 }
 
 // RequireAudience adds aud to audiences to validate.
-func (e *Enforcer) RequireAudience(aud string) error {
+func (e *stdEnforcer) RequireAudience(aud string) error {
 	return e.RequireValidator(WithAudience(aud))
 }
 
