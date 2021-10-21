@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// a token where everything that can go wrong, does
+// a jwt.Token where everything that can go wrong, does
 type murphyToken struct{}
 
 var murphyError = errors.New("Murphy says no")
