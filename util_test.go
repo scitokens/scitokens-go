@@ -12,19 +12,21 @@ func TestPrintToken(t *testing.T) {
 	assert := assert.New(t)
 	var buf bytes.Buffer
 	t1 := jwt.New()
+	t1.Set("ver", "scitoken:1.0")
+	t1.Set("jti", "my-id")
 	t1.Set("sub", "my-subject")
 	t1.Set("iss", "my-issuer")
 	t1.Set("aud", []string{"my-audience"})
-	t1.Set("foo", "bar")
 	PrintToken(&buf, t1)
-	ref := `Subject: my-subject
+	ref := `Token version: scitoken:1.0, ID: my-id
+Subject: my-subject
 Issuer: my-issuer
 Audience: [my-audience]
-Issued at: 0001-01-01 00:00:00 +0000 UTC, Expires at: 0001-01-01 00:00:00 +0000 UTC
+Issued at: 0001-01-01 00:00:00 +0000 UTC, Valid after: 0001-01-01 00:00:00 +0000 UTC, Expires at: 0001-01-01 00:00:00 +0000 UTC
 Claims:
-	foo: bar
+	ver: scitoken:1.0
 `
-	assert.Equal(buf.String(), ref)
+	assert.Equal(ref, buf.String())
 }
 
 func TestGetScopes(t *testing.T) {
@@ -102,5 +104,41 @@ func TestGetGroups(t *testing.T) {
 		}
 		_, err := GetGroups(t1)
 		assert.Error(err, "GetGroups should fail")
+	})
+}
+
+func TestGetVersion(t *testing.T) {
+	assert := assert.New(t)
+	t1 := jwt.New()
+	t.Run("no version", func(t *testing.T) {
+		v, err := GetVersion(t1)
+		if !assert.NoError(err, "GetVersion should succeed") {
+			return
+		}
+		assert.Equal(v, "")
+	})
+	t.Run("bad version", func(t *testing.T) {
+		assert.NoError(t1.Set("ver", 0))
+		_, err := GetVersion(t1)
+		if !assert.Error(err, "GetVersion should fail") {
+			return
+		}
+	})
+	t.Run("scitoken", func(t *testing.T) {
+		assert.NoError(t1.Set("ver", "scitoken:1.0"))
+		v, err := GetVersion(t1)
+		if !assert.NoError(err, "GetVersion should succeed") {
+			return
+		}
+		assert.Equal(v, "scitoken:1.0")
+	})
+	t.Run("WLCG token", func(t *testing.T) {
+		assert.NoError(t1.Remove("ver"))
+		assert.NoError(t1.Set("wlcg.ver", "1.0"))
+		v, err := GetVersion(t1)
+		if !assert.NoError(err, "GetVersion should succeed") {
+			return
+		}
+		assert.Equal(v, "wlcg:1.0")
 	})
 }

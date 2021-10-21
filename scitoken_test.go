@@ -1,6 +1,8 @@
 package scitokens
 
 import (
+	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -8,19 +10,99 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// a jwt.Token where everything that can go wrong, does
+type murphyToken struct{}
+
+var murphyError = errors.New("Murphy says no")
+
+func (t *murphyToken) Audience() []string {
+	return []string{}
+}
+
+func (t *murphyToken) Expiration() time.Time {
+	return time.Now()
+}
+
+func (t *murphyToken) IssuedAt() time.Time {
+	return time.Now()
+}
+
+func (t *murphyToken) Issuer() string {
+	return ""
+}
+
+func (t *murphyToken) JwtID() string {
+	return ""
+}
+
+func (t *murphyToken) NotBefore() time.Time {
+	return time.Now()
+}
+
+func (t *murphyToken) Subject() string {
+	return ""
+}
+
+func (t *murphyToken) PrivateClaims() map[string]interface{} {
+	return map[string]interface{}{}
+}
+
+func (t *murphyToken) Get(name string) (interface{}, bool) {
+	return nil, false
+}
+
+func (t *murphyToken) Set(name string, value interface{}) error {
+	return murphyError
+}
+
+func (t *murphyToken) Remove(name string) error {
+	return murphyError
+}
+
+func (t *murphyToken) Clone() (jwt.Token, error) {
+	return nil, murphyError
+}
+
+func (t *murphyToken) Iterate(ctx context.Context) jwt.Iterator {
+	return nil
+}
+
+func (t *murphyToken) Walk(ctx context.Context, v jwt.Visitor) error {
+	return murphyError
+}
+
+func (t *murphyToken) AsMap(ctx context.Context) (map[string]interface{}, error) {
+	return nil, murphyError
+}
+
 type testToken struct {
-	Name    string
-	Data    []byte
-	Subject string
-	Issuer  string
-	Scopes  []Scope
-	Groups  []string
+	Name     string
+	Data     []byte
+	Subject  string
+	Issuer   string
+	Scopes   []Scope
+	Groups   []string
+	Version  string
+	Audience []string
 }
 
 var (
 	// It goes without saying, but I'll say it anyways:
 	// EXPIRED TOKENS ONLY
 	testTokens = []testToken{
+		{
+			Name:    "bare SciToken",
+			Data:    []byte("eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiYm9ja2VsbSIsImV4cCI6MTUwOTk5MTc5MCwiaXNzIjoiaHR0cHM6Ly9zY2l0b2tlbnMub3JnL2NtcyIsImlhdCI6MTUwOTk4ODE5MCwic2NvcGUiOiJyZWFkOi9zdG9yZSB3cml0ZTovc3RvcmUvdXNlci9iYm9ja2VsbSIsIm5iZiI6MTUwOTk4ODE5MCwidmVyIjoic2NpdG9rZW46Mi4wIiwiYXVkIjoiaHR0cHM6Ly9jbXMuZXhhbXBsZS5jb20ifQ.fCtyZQQNPaowQ5FXFVIlbt2Qpb4ui8Bkl1qXpwLKI3FQ0AKP64Ozf7NLKI8nRHaAqh9XRQAxB9YtAJAeHriSN422-CraARoYyBdrZMtwlxphOLPkpuxbIusVYB3r4zIRt4BoB7NlqLqwVV2e5rGtkJGvi9tpY2FNr7eZ6eBrzAg"),
+			Subject: "bbockelm",
+			Issuer:  "https://scitokens.org/cms",
+			Scopes: []Scope{
+				{"read", "/store"},
+				{"write", "/store/user/bbockelm"},
+			},
+			Groups:   []string{},
+			Version:  "scitoken:2.0",
+			Audience: []string{"https://transfer-server.example.com"},
+		},
 		{
 			Name:    "WLCG test issuer",
 			Data:    []byte(`eyJraWQiOiJyc2ExIiwiYWxnIjoiUlMyNTYifQ.eyJ3bGNnLnZlciI6IjEuMCIsInN1YiI6ImM3NWMzMmNiLTU0ZGUtNDY2MC04NjVjLTFkNWM4NjlkMGQ3YSIsImF1ZCI6Imh0dHBzOlwvXC93bGNnLmNlcm4uY2hcL2p3dFwvdjFcL2FueSIsIm5iZiI6MTYzMzEyMTE1OCwic2NvcGUiOiJvcGVuaWQgcHJvZmlsZSBvZmZsaW5lX2FjY2VzcyBlbWFpbCB3bGNnIHdsY2cuZ3JvdXBzIiwiaXNzIjoiaHR0cHM6XC9cL3dsY2cuY2xvdWQuY25hZi5pbmZuLml0XC8iLCJleHAiOjE2MzMxMjQ3NTgsImlhdCI6MTYzMzEyMTE1OCwianRpIjoiOWU4OGFmNzAtZGIxMi00NWRlLWEwZTMtZDc3YTA0OTNhNzM0IiwiY2xpZW50X2lkIjoiY2Q1NjIzZTMtMTZkYS00MTU2LWEzNWYtYzBiOWU0MTkwZTA0Iiwid2xjZy5ncm91cHMiOlsiXC93bGNnIl19.dlz0VLighqFIyQ6wRk8kehRACfVnqSxRfZrAAaqneFgNCfhbGY65ZaAgCPHl2avfqRumYOqHr9PTbQLFp9bx6CV_Oa7kWguGOo2Dm59aoGO_XrlvhtGYJ3uxYUN6jQ8ZyQYaR8fgJmC3m1S_sVu56yg0HMC1jfFhCWec-cyes80`),
@@ -34,7 +116,9 @@ var (
 				{"wlcg", ""},
 				{"wlcg.groups", ""},
 			},
-			Groups: []string{"/wlcg"},
+			Groups:   []string{"/wlcg"},
+			Version:  "wlcg:1.0",
+			Audience: []string{"https://wlcg.cern.ch/jwt/v1/any"},
 		},
 	}
 )
@@ -72,6 +156,26 @@ func TestNewSciToken(t *testing.T) {
 			return
 		}
 		assert.Equal(st, st2)
+	})
+	t.Run("Murphy's token", func(t *testing.T) {
+		assert := assert.New(t)
+		t1 := &murphyToken{}
+		st1, err := NewSciToken(t1)
+		if !assert.NoError(err, "NewSciToken should succeed") {
+			return
+		}
+		if !assert.NotNil(st1, "SciToken should not be nil") {
+			return
+		}
+		assert.ErrorIs(st1.Set("foo", "bar"), murphyError)
+		assert.ErrorIs(st1.Remove("foo"), murphyError)
+		_, err = st1.Clone()
+		assert.ErrorIs(err, murphyError)
+		assert.Nil(st1.Iterate(context.Background()))
+		assert.ErrorIs(st1.Walk(context.Background(), nil), murphyError)
+		_, err = st1.AsMap(context.Background())
+		assert.ErrorIs(err, murphyError)
+
 	})
 	t.Run("SciToken with scope and groups", func(t *testing.T) {
 		assert := assert.New(t)
@@ -113,6 +217,24 @@ func TestNewSciToken(t *testing.T) {
 		_, err := NewSciToken(t1)
 		assert.Error(err, "NewSciToken should fail")
 	})
+	t.Run("SciToken with invalid audience", func(t *testing.T) {
+		assert := assert.New(t)
+		t1 := jwt.New()
+		st1, err := NewSciToken(t1)
+		if !assert.NoError(err, "NewSciToken should succeed") {
+			return
+		}
+		assert.Error(st1.Set("aud", 0), "setting aud should fail")
+	})
+	t.Run("SciToken with invalid version", func(t *testing.T) {
+		assert := assert.New(t)
+		t1 := jwt.New()
+		if !assert.NoError(t1.Set("ver", 0), "setting ver should succeed") {
+			return
+		}
+		_, err := NewSciToken(t1)
+		assert.Error(err, "NewSciToken should fail")
+	})
 	t.Run("Parsed SciTokens", func(t *testing.T) {
 		assert := assert.New(t)
 		for _, tok := range testTokens {
@@ -141,6 +263,8 @@ func TestNewSciToken(t *testing.T) {
 				assert.Equal(st.Issuer(), tok.Issuer)
 				assert.Equal(st.Scopes(), tok.Scopes)
 				assert.Equal(st.Groups(), tok.Groups)
+				assert.Equal(st.Version(), tok.Version)
+				assert.Equal(st.Audience(), tok.Audience)
 			})
 		}
 	})

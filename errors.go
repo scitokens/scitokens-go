@@ -13,6 +13,7 @@ var (
 	TokenNotFoundError     = errors.New("token not found")
 	ScopeParseError        = errors.New("unable to unmarshal and parse scope claim")
 	GroupParseError        = errors.New("unable to unmarshal wlcg.groups claim")
+	VersionParseError      = errors.New("unable to unmarshal ver claim")
 )
 
 type TokenValidationError struct {

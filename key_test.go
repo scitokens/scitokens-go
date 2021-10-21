@@ -107,7 +107,7 @@ func (s *fakeAuthServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // MakeToken creates and signs a test token with the given scopes and groups.
-func (s *fakeAuthServer) MakeToken(issuer string, scopes, groups interface{}) ([]byte, error) {
+func (s *fakeAuthServer) MakeToken(issuer string, scopes, groups, audience interface{}) ([]byte, error) {
 	t := jwt.New()
 	t.Set("iss", issuer)
 	t.Set("iat", time.Now())
@@ -120,6 +120,11 @@ func (s *fakeAuthServer) MakeToken(issuer string, scopes, groups interface{}) ([
 	}
 	if groups != nil {
 		if err := t.Set("wlcg.groups", groups); err != nil {
+			return nil, err
+		}
+	}
+	if audience != nil {
+		if err := t.Set("aud", audience); err != nil {
 			return nil, err
 		}
 	}

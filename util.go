@@ -10,10 +10,12 @@ import (
 
 // PrintToken pretty-prints the token claims to w.
 func PrintToken(w io.Writer, t jwt.Token) {
+	ver, _ := GetVersion(t)
+	fmt.Fprintf(w, "Token version: %s, ID: %s\n", ver, t.JwtID())
 	fmt.Fprintf(w, "Subject: %s\n", t.Subject())
 	fmt.Fprintf(w, "Issuer: %s\n", t.Issuer())
 	fmt.Fprintf(w, "Audience: %s\n", t.Audience())
-	fmt.Fprintf(w, "Issued at: %s, Expires at: %s\n", t.IssuedAt(), t.Expiration())
+	fmt.Fprintf(w, "Issued at: %s, Valid after: %s, Expires at: %s\n", t.IssuedAt(), t.NotBefore(), t.Expiration())
 	fmt.Fprintf(w, "Claims:\n")
 	for k, v := range t.PrivateClaims() {
 		fmt.Fprintf(w, "\t%v: %v\n", k, v)
@@ -63,4 +65,27 @@ func GetGroups(t jwt.Token) ([]string, error) {
 		groups[i] = gs
 	}
 	return groups, nil
+}
+
+// GetVersion retrieves the ver claim, or an empty string if the claim is
+// missing. For compatability it will also look for the wlcg.ver claim, which
+// will be returned as "wlcg:$ver", where $ver is the value of the claim.
+func GetVersion(t jwt.Token) (string, error) {
+	profile := ""
+	verint, ok := t.Get("ver")
+	if !ok {
+		profile = "wlcg"
+		verint, ok = t.Get("wlcg.ver")
+		if !ok {
+			return "", nil
+		}
+	}
+	ver, ok := verint.(string)
+	if !ok {
+		return "", VersionParseError
+	}
+	if profile != "" {
+		ver = profile + ":" + ver
+	}
+	return ver, nil
 }

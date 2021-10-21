@@ -51,6 +51,11 @@ func (e *Enforcer) AddIssuer(ctx context.Context, issuer string) error {
 	return nil
 }
 
+// RequireAudience adds aud to audiences to validate.
+func (e *Enforcer) RequireAudience(aud string) error {
+	return e.RequireValidator(WithAudience(aud))
+}
+
 // RequireScope adds s to scopes to validate.
 func (e *Enforcer) RequireScope(s Scope) error {
 	return e.RequireValidator(WithScope(s))
@@ -224,9 +229,15 @@ func tokenFilename() string {
 
 // Validate checks that the SciToken is valid and meets all constraints imposed
 // by the Enforcer, namely:
+//
 // * the issuer is accepted (via AddIssuer) and the token was signed by it
-// * all scopes added by RequiredScope are present in the scope claim
-// * all groups added by RequiredGroup are present in the wlcg.groups claim
+//
+// * all audiences added by RequireAudience or one of the recognized "any"
+//   audiences are present in the aud claim.
+//
+// * all scopes added by RequireScope are present in the scope claim
+//
+// * all groups added by RequireGroup are present in the wlcg.groups claim
 //
 // This can be called multiple times, e.g. to test the token against different
 // scopes.
