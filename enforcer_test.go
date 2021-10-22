@@ -90,79 +90,93 @@ func TestEnforcer(t *testing.T) {
 		return
 	}
 
-	t.Run("validate token", func(t *testing.T) {
-		enf, err := NewEnforcerDaemon(ctx, ts.URL)
-		if !assert.NoError(err, "NewEnforcerDaemon should succeed") {
-			return
-		}
+	type testEnforcer struct {
+		Name string
+		E    Enforcer
+	}
+	enforcers := make([]testEnforcer, 2)
+	enf, err := NewEnforcer(ts.URL)
+	if !assert.NoError(err, "NewEnforcerDaemon should succeed") {
+		return
+	}
+	enforcers[0] = testEnforcer{"NewEnforcerDaemon", enf}
+	enf, err = NewEnforcerDaemon(ctx, ts.URL)
+	if !assert.NoError(err, "NewEnforcerDaemon should succeed") {
+		return
+	}
+	enforcers[1] = testEnforcer{"NewEnforcer", enf}
+	for _, enf := range enforcers {
+		t.Run(fmt.Sprintf("validate token with %s", enf.Name), func(t *testing.T) {
+			enf := enf.E
 
-		for _, nt := range invalidTokens {
-			_, err = enf.ValidateToken(nt)
-			assert.Error(err)
-		}
+			for _, nt := range invalidTokens {
+				_, err = enf.ValidateToken(nt)
+				assert.Error(err)
+			}
 
-		// we have to go around the enforcer parsing to check the error handling in Validate
-		// this also lets us test error types and wrapping explicitely
-		jt, err := jwt.Parse(invalidIssuerToken)
-		if !assert.NoError(err) {
-			return
-		}
-		st, err := NewSciToken(jt)
-		if !assert.NoError(err) {
-			return
-		}
-		err = enf.Validate(st)
-		e := &TokenValidationError{}
-		assert.ErrorAs(err, &e)
-		assert.ErrorIs(err, UntrustedIssuerError)
+			// we have to go around the enforcer parsing to check the error handling in Validate
+			// this also lets us test error types and wrapping explicitely
+			jt, err := jwt.Parse(invalidIssuerToken)
+			if !assert.NoError(err) {
+				return
+			}
+			st, err := NewSciToken(jt)
+			if !assert.NoError(err) {
+				return
+			}
+			err = enf.Validate(st)
+			e := &TokenValidationError{}
+			assert.ErrorAs(err, &e)
+			assert.ErrorIs(err, UntrustedIssuerError)
 
-		st1, err := enf.ValidateToken(t1)
-		assert.NoError(err, "ValidateToken should succeed for token with no scopes or groups")
-		assert.Error(enf.Validate(st1, WithGroup("foo")), "Validate should fail for token missing required group")
-		assert.Error(enf.Validate(st1, WithScope(Scope{"read", "/"})), "Validate should fail for token missing required scope")
-		st2, err := enf.ValidateToken(t2)
-		assert.NoError(err, "ValidateToken should succeed with no additional validators")
-		st3, err := enf.ValidateToken(t3)
-		assert.NoError(err, "ValidateToken should succeed with no additional validators")
-		st4, err := enf.ValidateToken(t4)
-		assert.NoError(err, "ValidateToken should succeed with no additional validators")
+			st1, err := enf.ValidateToken(t1)
+			assert.NoError(err, "ValidateToken should succeed for token with no scopes or groups")
+			assert.Error(enf.Validate(st1, WithGroup("foo")), "Validate should fail for token missing required group")
+			assert.Error(enf.Validate(st1, WithScope(Scope{"read", "/"})), "Validate should fail for token missing required scope")
+			st2, err := enf.ValidateToken(t2)
+			assert.NoError(err, "ValidateToken should succeed with no additional validators")
+			st3, err := enf.ValidateToken(t3)
+			assert.NoError(err, "ValidateToken should succeed with no additional validators")
+			st4, err := enf.ValidateToken(t4)
+			assert.NoError(err, "ValidateToken should succeed with no additional validators")
 
-		if !assert.NoError(enf.RequireAudience("foo")) {
-			return
-		}
-		assert.NoError(enf.Validate(st1), "ValidateToken should pass for token with no audience")
-		assert.Error(enf.Validate(st2), "ValidateToken should fail for token missing required audience or ANY")
-		assert.NoError(st2.Set("aud", "ANY"))
-		assert.NoError(enf.Validate(st2), "ValidateToken should pass for token with any audience")
-		assert.NoError(enf.Validate(st3), "ValidateToken should pass for token with any audience")
-		assert.NoError(enf.Validate(st4), "ValidateToken should pass for token with required audience")
+			if !assert.NoError(enf.RequireAudience("foo")) {
+				return
+			}
+			assert.NoError(enf.Validate(st1), "ValidateToken should pass for token with no audience")
+			assert.Error(enf.Validate(st2), "ValidateToken should fail for token missing required audience or ANY")
+			assert.NoError(st2.Set("aud", "ANY"))
+			assert.NoError(enf.Validate(st2), "ValidateToken should pass for token with any audience")
+			assert.NoError(enf.Validate(st3), "ValidateToken should pass for token with any audience")
+			assert.NoError(enf.Validate(st4), "ValidateToken should pass for token with required audience")
 
-		if !assert.NoError(enf.RequireGroup("foo")) {
-			return
-		}
-		assert.Error(enf.Validate(st1), "ValidateToken should fail for token missing required group")
-		assert.NoError(enf.Validate(st2), "ValidateToken should succeed for token with required group")
+			if !assert.NoError(enf.RequireGroup("foo")) {
+				return
+			}
+			assert.Error(enf.Validate(st1), "ValidateToken should fail for token missing required group")
+			assert.NoError(enf.Validate(st2), "ValidateToken should succeed for token with required group")
 
-		if !assert.NoError(enf.RequireScope(Scope{"compute", ""})) {
-			return
-		}
-		assert.Error(enf.Validate(st1), "ValidateToken should fail for token missing required scope (1)")
-		assert.Error(enf.Validate(st2), "ValidateToken should fail for token missing required scope (2)")
-		assert.NoError(enf.Validate(st3), "ValidateToken should succeed for token with required scope")
+			if !assert.NoError(enf.RequireScope(Scope{"compute", ""})) {
+				return
+			}
+			assert.Error(enf.Validate(st1), "ValidateToken should fail for token missing required scope (1)")
+			assert.Error(enf.Validate(st2), "ValidateToken should fail for token missing required scope (2)")
+			assert.NoError(enf.Validate(st3), "ValidateToken should succeed for token with required scope")
 
-		if !assert.NoError(enf.RequireValidator(WithScope(Scope{"read", "/foo"}))) {
-			return
-		}
-		assert.Error(enf.Validate(st1), "ValidateToken should fail for token missing required scope path (1)")
-		assert.Error(enf.Validate(st2), "ValidateToken should fail for token missing required scope path (2)")
-		assert.Error(enf.Validate(st3), "ValidateToken should fail for token missing required scope path (3)")
-		assert.NoError(enf.Validate(st4), "ValidateToken should succeed for token with required scope path")
+			if !assert.NoError(enf.RequireValidator(WithScope(Scope{"read", "/foo"}))) {
+				return
+			}
+			assert.Error(enf.Validate(st1), "ValidateToken should fail for token missing required scope path (1)")
+			assert.Error(enf.Validate(st2), "ValidateToken should fail for token missing required scope path (2)")
+			assert.Error(enf.Validate(st3), "ValidateToken should fail for token missing required scope path (3)")
+			assert.NoError(enf.Validate(st4), "ValidateToken should succeed for token with required scope path")
 
-		assert.Error(enf.Validate(st4, WithScope(Scope{"read", "/bar"})), "ValidateToken should fail for token missing required scope path (4)")
-		assert.Error(enf.Validate(st4, WithScope(Scope{"write", "/foo"})), "ValidateToken should fail for token missing required scope (3)")
-		assert.NoError(enf.Validate(st4, WithScope(Scope{"read", "/foo/bar"})), "ValidateToken should succeed for token with required scope parent path")
+			assert.Error(enf.Validate(st4, WithScope(Scope{"read", "/bar"})), "ValidateToken should fail for token missing required scope path (4)")
+			assert.Error(enf.Validate(st4, WithScope(Scope{"write", "/foo"})), "ValidateToken should fail for token missing required scope (3)")
+			assert.NoError(enf.Validate(st4, WithScope(Scope{"read", "/foo/bar"})), "ValidateToken should succeed for token with required scope parent path")
 
-	})
+		})
+	}
 
 	t.Run("validate token from string", func(t *testing.T) {
 		enf, err := NewEnforcerDaemon(ctx, ts.URL)
