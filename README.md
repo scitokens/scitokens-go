@@ -65,10 +65,10 @@ func PrintSciToken(tok []byte) error {
 
 The [`Enforcer`](https://pkg.go.dev/github.com/scitokens/scitokens-go#Enforcer)
 interface defines methods used to verify and validate tokens. Instantiate an
-inforcer with either
+enforcer with either
 [`NewEnforcer()`](https://pkg.go.dev/github.com/scitokens/scitokens-go#NewEnforcer)
 for one-shot/throwaway use, or
-[`NewEnforcerDaemon()`](https://pkg.go.dev/github.com/scitokens/scitokens-go#NewEnforcerDaemon))
+[`NewEnforcerDaemon()`](https://pkg.go.dev/github.com/scitokens/scitokens-go#NewEnforcerDaemon)
 for long-lived processes. Both require one or more supported issuer URLs, and
 `NewEnforcerDaemon` additionally requires a context that defines the lifetime of
 the Enforcer and its background goroutines.
