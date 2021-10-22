@@ -275,8 +275,18 @@ func TestEnforcer(t *testing.T) {
 			return
 		}
 
+		// create temporary directory to use for token files
+		dir, err := os.MkdirTemp("", "scitokentest")
+		if !assert.NoError(err, "MkdirTemp should succeed") {
+			return
+		}
+		defer os.RemoveAll(dir)
+
 		resetEnv := clearEnv("BEARER_TOKEN", "BEARER_TOKEN_FILE", "XDG_RUNTIME_DIR", "TMPDIR")
 		defer resetEnv()
+
+		// need to prevent fallback to /tmp since there may be an actual token there
+		os.Setenv("TMPDIR", dir)
 
 		_, err = enf.ValidateTokenEnvironment()
 		assert.ErrorIs(err, TokenNotFoundError, "ValidateTokenEnvironment should return TokenNotFoundError")
@@ -296,13 +306,6 @@ func TestEnforcer(t *testing.T) {
 		assert.NoError(err, "ValidateTokenEnvironment should succeed for BEARER_TOKEN var")
 		os.Unsetenv("BEARER_TOKEN")
 
-		// create temporary directory to use for token files
-		dir, err := os.MkdirTemp("", "scitokentest")
-		if !assert.NoError(err, "MkdirTemp should succeed") {
-			return
-		}
-		defer os.RemoveAll(dir)
-
 		file := filepath.Join(dir, fmt.Sprintf("/bt_u%d", os.Getuid()))
 		if !assert.NoError(os.WriteFile(file, t1, 0600), "WriteFile should succeed") {
 			return
@@ -318,7 +321,6 @@ func TestEnforcer(t *testing.T) {
 		assert.NoError(err, "ValidateTokenEnvironment should succeed for XDG_RUNTIME_DIR var")
 		os.Unsetenv("XDG_RUNTIME_DIR")
 
-		os.Setenv("TMPDIR", dir)
 		_, err = enf.ValidateTokenEnvironment()
 		assert.NoError(err, "ValidateTokenEnvironment should succeed for TMPDIR var")
 		os.Unsetenv("TMPDIR")
