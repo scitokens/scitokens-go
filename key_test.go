@@ -351,3 +351,69 @@ func TestIssuerKeyManager(t *testing.T) {
 		assert.Equal(ks.Len(), 1, "keyset should have one key")
 	})
 }
+
+func TestIssuerKeyFetcher(t *testing.T) {
+	assert := assert.New(t)
+	srv, err := newFakeAuthServer()
+	if !assert.NoError(err) {
+		return
+	}
+	ts := httptest.NewTLSServer(srv)
+	defer ts.Close()
+	http.DefaultClient = ts.Client()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	t.Run("IssuerKeyFetcher not initialized", func(t *testing.T) {
+		ikf := IssuerKeyFetcher{}
+		_, err = ikf.GetIssuerKeys(ctx, ts.URL)
+		assert.ErrorIs(err, UntrustedIssuerError, "unitialized IssuerKeyFetcher can be used, but doesn't trust any issuers")
+		_, err = ikf.KeySetFrom(jwt.New())
+		assert.ErrorIs(err, UntrustedIssuerError, "unitialized IssuerKeyFetcher can be used, but doesn't trust any issuers")
+
+		err := ikf.AddIssuer(ctx, ts.URL)
+		assert.NoError(err, "IssuerKeyFetcher doesn't need to be initialized")
+
+		_, err = ikf.GetIssuerKeys(ctx, ts.URL)
+		assert.NoError(err)
+	})
+
+	ikf := NewIssuerKeyFetcher("https://example.com")
+	assert.Equal(map[string]bool{"https://example.com": true}, ikf.issuers)
+
+	t.Run("add issuer", func(t *testing.T) {
+		if !assert.NoError(ikf.AddIssuer(ctx, ts.URL)) {
+			return
+		}
+		_, ok := ikf.issuers[ts.URL]
+		assert.True(ok, "issuer should have been added")
+	})
+
+	t.Run("get issuer keys", func(t *testing.T) {
+		_, err := ikf.GetIssuerKeys(ctx, "https://bad.example.com")
+		assert.Error(err, "GetIssuerKeys should fail for issuer that has not been added")
+		assert.ErrorIs(err, UntrustedIssuerError)
+
+		ks, err := ikf.GetIssuerKeys(ctx, ts.URL)
+		if !assert.NoError(err, "GetIssuerKeys should succeed") {
+			return
+		}
+		assert.Equal(ks.Len(), 1, "keyset should have one key")
+	})
+
+	t.Run("get key set for token issuer", func(t *testing.T) {
+		t1 := jwt.New()
+		t1.Set("iss", "https://bad.example.com")
+		_, err := ikf.KeySetFrom(t1)
+		assert.Error(err, "KeySetFrom should fail for token with issuer that has not been added")
+		assert.ErrorIs(err, UntrustedIssuerError)
+
+		t1.Set("iss", ts.URL)
+		ks, err := ikf.KeySetFrom(t1)
+		if !assert.NoError(err, "KeySetFrom should succeed") {
+			return
+		}
+		assert.Equal(ks.Len(), 1, "keyset should have one key")
+	})
+}

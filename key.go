@@ -91,9 +91,75 @@ func IssuerKeyURL(ctx context.Context, issuer string) (string, error) {
 	return meta.JWKSURL, nil
 }
 
-// IssuerKeyManager handles fetching metadata, then fetching, caching, and
-// refreshing keys for each issuer, and implements jwt.KeySetProvider, providing
-// jwt.Parse... with the appropriate keys for the token issuer.
+// GetIssuerKeys returns all JSON Web Keys for the given issuer, fetching from
+// the jwks_uri specified in the issuer's OAuth metadata. This will fetch the
+// metadata and keys with every call, use an IssuerKeyManager to cache them for
+// long-running processes.
+func GetIssuerKeys(ctx context.Context, issuer string) (jwk.Set, error) {
+	url, err := IssuerKeyURL(ctx, issuer)
+	if err != nil {
+		return nil, err
+	}
+	return jwk.Fetch(ctx, url)
+}
+
+// IssuerKeyProvider implements jwt.KeySetProvider, providing jwt.Parse... with
+// the appropriate keys for one or more token issuers.
+type IssuerKeyProvider interface {
+	jwt.KeySetProvider
+	AddIssuer(context.Context, string) error
+	GetIssuerKeys(context.Context, string) (jwk.Set, error)
+}
+
+// IssuerKeyFetcher is an IssuerKeyProvider that fetches keys on demand.
+type IssuerKeyFetcher struct {
+	issuers map[string]bool
+}
+
+// NewIssuerKeyFetcher initializes a new key manager that DOES NOT cache keys,
+// rather fetching them on demand. Use NewIssuerKeyManager() for long-lived
+// processes.
+func NewIssuerKeyFetcher(issuers ...string) *IssuerKeyFetcher {
+	ikf := &IssuerKeyFetcher{}
+	for _, iss := range issuers {
+		ikf.AddIssuer(context.Background(), iss)
+	}
+	return ikf
+}
+
+// AddIssuer determines the JSON Web Keys URL for the given issuer, and adds it
+// to the list of issuers trusted by this IssueKeyFetcher and accepted when
+// using KeySetFrom() for validating tokens.
+func (m *IssuerKeyFetcher) AddIssuer(ctx context.Context, issuer string) error {
+	if m.issuers == nil {
+		m.issuers = make(map[string]bool)
+	}
+	m.issuers[issuer] = true
+	return nil
+}
+
+// GetIssuerKeys returns all JSON Web Keys for the given issuer, fetching from
+// the jwks_uri specified in the issuer's OAuth metadata.
+// AddIssuer() must be called first for this issuer.
+func (m *IssuerKeyFetcher) GetIssuerKeys(ctx context.Context, issuer string) (jwk.Set, error) {
+	if m.issuers == nil {
+		return nil, UntrustedIssuerError
+	}
+	_, ok := m.issuers[issuer]
+	if !ok {
+		return nil, UntrustedIssuerError
+	}
+	return GetIssuerKeys(ctx, issuer)
+}
+
+// KeySetFrom returns the key set for the token, based on the token's issuer.
+// The issuer must first be added to the IssuerKeyManager with AddIssuer().
+func (m *IssuerKeyFetcher) KeySetFrom(t jwt.Token) (jwk.Set, error) {
+	return m.GetIssuerKeys(context.Background(), t.Issuer())
+}
+
+// IssuerKeyManager is an IssuerKeyProvider that refreshes keys on a regular
+// interval.
 type IssuerKeyManager struct {
 	// issuerKeyURLs is a cache of the JWKSURL for each issuer
 	issuerKeyURLs map[string]string
@@ -150,16 +216,4 @@ func (m *IssuerKeyManager) KeySetFrom(t jwt.Token) (jwk.Set, error) {
 		return nil, IKMNotInitializedError
 	}
 	return m.GetIssuerKeys(context.Background(), t.Issuer())
-}
-
-// GetIssuerKeys returns all JSON Web Keys for the given issuer, fetching from
-// the jwks_uri specified in the issuer's OAuth metadata. This will fetch the
-// metadata and keys with every call, use an IssuerKeyManager to cache them for
-// long-running processes.
-func GetIssuerKeys(ctx context.Context, issuer string) (jwk.Set, error) {
-	url, err := IssuerKeyURL(ctx, issuer)
-	if err != nil {
-		return nil, err
-	}
-	return jwk.Fetch(ctx, url)
 }
