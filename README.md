@@ -1,7 +1,7 @@
 # scitokens-go [![Go Reference](https://pkg.go.dev/badge/github.com/scitokens/scitokens-go.svg)](https://pkg.go.dev/github.com/scitokens/scitokens-go)
 
-**WORK IN PROGRESS** library for handling [SciTokens](https://scitokens.org)
-from Go, based on
+**WORK IN PROGRESS** library for handling [SciTokens](https://scitokens.org) and
+[WLCG tokens](https://doi.org/10.5281/zenodo.3460258) from Go, based on
 [github.com/lestrrat-go/jwx](https://github.com/lestrrat-go/jwx) libraries.
 Included is a `scitoken-validate` command-line tool that uses the library to
 validate SciTokens with various criteria.
@@ -61,23 +61,38 @@ func PrintSciToken(tok []byte) error {
 ### Validating Tokens
 
 The [`Enforcer`](https://pkg.go.dev/github.com/scitokens/scitokens-go#Enforcer)
-object is used to verify and validate tokens. Instantiate it with
-[`NewEnforcer()`](https://pkg.go.dev/github.com/scitokens/scitokens-go#NewEnforcer),
-passing a context that defines the lifetime of the Enforcer and one or more
-supported issuer URLs.
+interface defines methods used to verify and validate tokens. Instantiate an
+inforcer with either
+[`NewEnforcer()`](https://pkg.go.dev/github.com/scitokens/scitokens-go#NewEnforcer)
+for one-shot/throwaway use, or
+[`NewEnforcerDaemon()`](https://pkg.go.dev/github.com/scitokens/scitokens-go#NewEnforcerDaemon))
+for long-lived processes. Both require one or more supported issuer URLs, and
+`NewEnforcerDaemon` additionally requires a context that defines the lifetime of
+the Enforcer and its background goroutines.
 
 ``` go
-ctx, cancel := context.WithCancel(context.Background())
-defer cancel()
-enf, err := scitokens.NewEnforcer(ctx, "https://example.com")
+enf, err := scitokens.NewEnforcer("https://example.com")
 if err != nil {
 	log.Fatalf("failed to initialize enforcer: %s", err)
 }
 ```
 
-In the background the Enforcer will fetch and cache the signing keys from the
-issuer, and start a goroutine that will routinely refresh the keys (for
-long-lived processes). Additional issuers can be added later with
+An enforcer instantiated with `NewEnforcer()` will fetch signing keys on-demand
+when a token is validated.
+
+``` go
+ctx, cancel := context.WithCancel(context.Background())
+defer cancel()
+enf, err := scitokens.NewEnforcerDaemon(ctx, "https://example.com")
+if err != nil {
+	log.Fatalf("failed to initialize enforcer: %s", err)
+}
+```
+
+An Enforcer instantiated with `NewEnforcerDaemon()` will fetch and cache the
+signing keys from the issuer, and start a goroutine that will routinely refresh
+the keys until the context is cancelled. Additional issuers can be added later
+with
 [`AddIssuer()`](https://pkg.go.dev/github.com/scitokens/scitokens-go#Enforcer.AddIssuer).
 
 The enforcer provides a
@@ -95,18 +110,28 @@ checks, this is by design, although it could change in the future if there is a
 good use case (the `ValidateToken...` function signatures and behavior won't
 change though).
 
-Additional validation criteria can be attached to the enforcer with the
-[`RequireScope()`](https://pkg.go.dev/github.com/scitokens/scitokens-go#Enforcer.RequireScope)
-and
-[`RequireGroup()`](https://pkg.go.dev/github.com/scitokens/scitokens-go#Enforcer.RequireGroup)
-methods, which take a
-[`Scope`](https://pkg.go.dev/github.com/scitokens/scitokens-go#Scope) object
-that the token must have in the `scope` claim (pathed scopes will match exactly
-or for a hierarchical parent) and a group name that must be in the `wlcg.groups`
-claim (group name must match exactly, but leading slash is optional),
-respectively.
+Additional validation criteria can be attached to the enforcer with the following methods:
+
+* [`RequireAudience()`](https://pkg.go.dev/github.com/scitokens/scitokens-go#Enforcer.RequireAudience),
+  which takes a string representing the service's URL or some other identifier.
+  It will check the tokens have this audience, or one of the standard wildcard
+  audiences, currently "ANY" or "https://wlcg.cern.ch/jwt/v1/any". If not
+  specified, the token audience will not be checked at all.
+
+* [`RequireScope()`](https://pkg.go.dev/github.com/scitokens/scitokens-go#Enforcer.RequireScope),
+  which takes a
+  [`Scope`](https://pkg.go.dev/github.com/scitokens/scitokens-go#Scope) object
+  that the token must have in the `scope` claim (pathed scopes will match
+  exactly or for a hierarchical parent).
+
+* [`RequireGroup()`](https://pkg.go.dev/github.com/scitokens/scitokens-go#Enforcer.RequireGroup),
+  which takes a group name that must be in the `wlcg.groups` claim (group name
+  must match exactly, but the leading slash is optional).
 
 ``` go
+if err := enf.RequireAudience("https://example.com"); err != nil {
+	log.Fatal(err)
+}
 if err := enf.RequireScope(scitokens.Scope{"compute.read", ""}); err != nil {
 	log.Fatal(err)
 }
