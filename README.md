@@ -3,8 +3,11 @@
 **WORK IN PROGRESS** library for handling [SciTokens](https://scitokens.org) and
 [WLCG tokens](https://doi.org/10.5281/zenodo.3460258) from Go, based on
 [github.com/lestrrat-go/jwx](https://github.com/lestrrat-go/jwx) libraries.
+
 Included is a `scitoken-validate` command-line tool that uses the library to
-validate SciTokens with various criteria.
+print and validate SciTokens with various criteria, see [its
+README](https://github.com/scitokens/scitokens-go/tree/master/cmd/scitoken-validate)
+for installation and usage documentation.
 
 The Enforcer API is believed to be stable, but breaking changes may still occur
 until version 1.0.0 is released. 
