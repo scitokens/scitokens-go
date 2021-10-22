@@ -31,8 +31,27 @@ type Enforcer interface {
 	ValidateTokenRequest(*http.Request, ...Validator) (SciToken, error)
 }
 
+type issuerSet map[string]bool
+
+func newIssuerSet(issuers ...string) issuerSet {
+	s := make(map[string]bool)
+	for _, i := range issuers {
+		s[i] = true
+	}
+	return s
+}
+
+func (s issuerSet) add(issuer string) {
+	s[issuer] = true
+}
+
+func (s issuerSet) has(issuer string) bool {
+	_, ok := s[issuer]
+	return ok
+}
+
 type stdEnforcer struct {
-	issuers    map[string]bool
+	issuers    issuerSet
 	ikm        IssuerKeyProvider
 	validators []Validator
 }
@@ -45,7 +64,7 @@ func NewEnforcer(issuers ...string) (Enforcer, error) {
 		return nil, errors.New("must accept at least one issuer")
 	}
 	e := &stdEnforcer{
-		issuers:    make(map[string]bool),
+		issuers:    newIssuerSet(issuers...),
 		ikm:        NewIssuerKeyFetcher(issuers...),
 		validators: make([]Validator, 0),
 	}
@@ -60,7 +79,7 @@ func NewEnforcerDaemon(ctx context.Context, issuers ...string) (Enforcer, error)
 		return nil, errors.New("must accept at least one issuer")
 	}
 	e := &stdEnforcer{
-		issuers:    make(map[string]bool),
+		issuers:    newIssuerSet(issuers...),
 		ikm:        NewIssuerKeyManager(ctx),
 		validators: make([]Validator, 0),
 	}
@@ -78,7 +97,7 @@ func (e *stdEnforcer) AddIssuer(ctx context.Context, issuer string) error {
 	if err != nil {
 		return fmt.Errorf("failed to fetch keyset for issuer %s: %w", issuer, err)
 	}
-	e.issuers[issuer] = true
+	e.issuers.add(issuer)
 	return nil
 }
 
@@ -274,7 +293,7 @@ func tokenFilename() string {
 // scopes.
 func (e *stdEnforcer) Validate(t SciToken, constraints ...Validator) error {
 	// validate standard claims
-	if _, ok := e.issuers[t.Issuer()]; !ok {
+	if !e.issuers.has(t.Issuer()) {
 		return &TokenValidationError{UntrustedIssuerError}
 	}
 	opts := make([]jwt.ValidateOption, len(e.validators)+len(constraints))
