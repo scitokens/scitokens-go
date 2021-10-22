@@ -24,10 +24,10 @@ var WellKnown = []string{
 	"openid-configuration",
 }
 
-// AuthServerMetadata per
+// OAuth server Metadata per
 // https://datatracker.ietf.org/doc/html/draft-ietf-oauth-discovery-07. Fields
 // defined as OPTIONAL that aren't currently used are not included.
-type AuthServerMetadata struct {
+type Metadata struct {
 	Issuer          string   `json:"issuer"`
 	AuthURL         string   `json:"authorization_endpoint"`
 	TokenURL        string   `json:"token_endpoint"`
@@ -40,7 +40,7 @@ type AuthServerMetadata struct {
 
 // FetchMetadata retrieves the OAUTH 2.0 authorization server metadata from the
 // given URL, which must include the complete well-known path to the resource.
-func FetchMetadata(ctx context.Context, urlstring string) (*AuthServerMetadata, error) {
+func FetchMetadata(ctx context.Context, urlstring string) (*Metadata, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", urlstring, nil)
 	if err != nil {
 		return nil, err
@@ -61,7 +61,7 @@ func FetchMetadata(ctx context.Context, urlstring string) (*AuthServerMetadata, 
 	// DEBUG
 	//rr = io.TeeReader(r.Body, os.Stderr)
 
-	var meta AuthServerMetadata
+	var meta Metadata
 	dec := json.NewDecoder(rr)
 	err = dec.Decode(&meta)
 	if err != nil {
@@ -73,7 +73,7 @@ func FetchMetadata(ctx context.Context, urlstring string) (*AuthServerMetadata, 
 // KeyURL determines the URL for JWKS keys for the issuer, based on its
 // OAuth metadata.
 func KeyURL(ctx context.Context, issuer string) (string, error) {
-	var meta *AuthServerMetadata
+	var meta *Metadata
 	for _, wk := range WellKnown {
 		var err error
 		meta, err = FetchMetadata(ctx, issuer+path.Join("/.well-known", wk))
