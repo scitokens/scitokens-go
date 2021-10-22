@@ -96,15 +96,17 @@ func TestEnforcer(t *testing.T) {
 	}
 	enforcers := make([]testEnforcer, 2)
 	enf, err := NewEnforcer(ts.URL)
-	if !assert.NoError(err, "NewEnforcerDaemon should succeed") {
+	if !assert.NoError(err, "NewEnforcer should succeed") {
 		return
 	}
-	enforcers[0] = testEnforcer{"NewEnforcerDaemon", enf}
+	enforcers[0] = testEnforcer{"NewEnforcer", enf}
+
 	enf, err = NewEnforcerDaemon(ctx, ts.URL)
 	if !assert.NoError(err, "NewEnforcerDaemon should succeed") {
 		return
 	}
-	enforcers[1] = testEnforcer{"NewEnforcer", enf}
+	enforcers[1] = testEnforcer{"NewEnforcerDaemon", enf}
+
 	for _, enf := range enforcers {
 		t.Run(fmt.Sprintf("validate token with %s", enf.Name), func(t *testing.T) {
 			enf := enf.E
