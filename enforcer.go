@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 
 	"github.com/lestrrat-go/jwx/jwt"
+	"github.com/scitokens/scitokens-go/issuer"
 )
 
 // Enforcer verifies that SciTokens https://scitokens.org are valid, from a
@@ -52,7 +53,7 @@ func (s issuerSet) has(issuer string) bool {
 
 type stdEnforcer struct {
 	issuers    issuerSet
-	ikm        IssuerKeyProvider
+	keys       issuer.KeyProvider
 	validators []Validator
 }
 
@@ -65,7 +66,7 @@ func NewEnforcer(issuers ...string) (Enforcer, error) {
 	}
 	e := &stdEnforcer{
 		issuers:    newIssuerSet(issuers...),
-		ikm:        NewIssuerKeyFetcher(issuers...),
+		keys:       issuer.NewKeyFetcher(issuers...),
 		validators: make([]Validator, 0),
 	}
 	return e, nil
@@ -80,7 +81,7 @@ func NewEnforcerDaemon(ctx context.Context, issuers ...string) (Enforcer, error)
 	}
 	e := &stdEnforcer{
 		issuers:    newIssuerSet(issuers...),
-		ikm:        NewIssuerKeyManager(ctx),
+		keys:       issuer.NewKeyManager(ctx),
 		validators: make([]Validator, 0),
 	}
 	for _, i := range issuers {
@@ -93,7 +94,7 @@ func NewEnforcerDaemon(ctx context.Context, issuers ...string) (Enforcer, error)
 
 // AddIssuer adds an accepted issuer and fetches its signing keys.
 func (e *stdEnforcer) AddIssuer(ctx context.Context, issuer string) error {
-	err := e.ikm.AddIssuer(ctx, issuer)
+	err := e.keys.AddIssuer(ctx, issuer)
 	if err != nil {
 		return fmt.Errorf("failed to fetch keyset for issuer %s: %w", issuer, err)
 	}
@@ -125,7 +126,7 @@ func (e *stdEnforcer) RequireValidator(v Validator) error {
 
 func (e *stdEnforcer) parseOptions() []jwt.ParseOption {
 	return []jwt.ParseOption{
-		jwt.WithKeySetProvider(e.ikm),
+		jwt.WithKeySetProvider(e.keys),
 		jwt.InferAlgorithmFromKey(true),
 	}
 }
@@ -294,7 +295,7 @@ func tokenFilename() string {
 func (e *stdEnforcer) Validate(t SciToken, constraints ...Validator) error {
 	// validate standard claims
 	if !e.issuers.has(t.Issuer()) {
-		return &TokenValidationError{UntrustedIssuerError}
+		return &TokenValidationError{issuer.UntrustedIssuerError}
 	}
 	opts := make([]jwt.ValidateOption, len(e.validators)+len(constraints))
 	for i, v := range e.validators {

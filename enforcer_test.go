@@ -12,13 +12,15 @@ import (
 	"testing"
 
 	"github.com/lestrrat-go/jwx/jwt"
+	"github.com/scitokens/scitokens-go/internal"
+	"github.com/scitokens/scitokens-go/issuer"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestEnforcer(t *testing.T) {
 	assert := assert.New(t)
 
-	srv, err := newFakeAuthServer()
+	srv, err := internal.NewFakeAuthServer()
 	if !assert.NoError(err) {
 		return
 	}
@@ -129,7 +131,7 @@ func TestEnforcer(t *testing.T) {
 			err = enf.Validate(st)
 			e := &TokenValidationError{}
 			assert.ErrorAs(err, &e)
-			assert.ErrorIs(err, UntrustedIssuerError)
+			assert.ErrorIs(err, issuer.UntrustedIssuerError)
 
 			st1, err := enf.ValidateToken(t1)
 			assert.NoError(err, "ValidateToken should succeed for token with no scopes or groups")

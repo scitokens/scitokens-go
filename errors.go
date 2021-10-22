@@ -6,14 +6,11 @@ import (
 )
 
 var (
-	MetadataNotFoundError  = errors.New("metadata not found")
-	IKMNotInitializedError = errors.New("IssuerKeyManager not initialized")
-	UntrustedIssuerError   = errors.New("issuer not trusted")
-	NotSciTokenError       = errors.New("token is not a SciToken")
-	TokenNotFoundError     = errors.New("token not found")
-	ScopeParseError        = errors.New("unable to unmarshal and parse scope claim")
-	GroupParseError        = errors.New("unable to unmarshal wlcg.groups claim")
-	VersionParseError      = errors.New("unable to unmarshal ver claim")
+	NotSciTokenError   = errors.New("token is not a SciToken")
+	TokenNotFoundError = errors.New("token not found")
+	ScopeParseError    = errors.New("unable to unmarshal and parse scope claim")
+	GroupParseError    = errors.New("unable to unmarshal wlcg.groups claim")
+	VersionParseError  = errors.New("unable to unmarshal ver claim")
 )
 
 type TokenValidationError struct {
