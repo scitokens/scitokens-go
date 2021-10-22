@@ -13,16 +13,15 @@ import (
 	"github.com/lestrrat-go/jwx/jwt"
 )
 
-var (
-	// WellKnown is a list of well-known URL suffixes to check for OAuth server
-	// metadata. See
-	// https://www.iana.org/assignments/well-known-uris/well-known-uris.xhtml
-	// https://datatracker.ietf.org/doc/html/draft-ietf-oauth-discovery-07
-	WellKnown = []string{
-		"oauth-authorization-server",
-		"openid-configuration",
-	}
-)
+// WellKnown is a list of well-known URL suffixes to check for OAuth server
+// metadata. See
+// https://www.iana.org/assignments/well-known-uris/well-known-uris.xhtml
+// and
+// https://datatracker.ietf.org/doc/html/draft-ietf-oauth-discovery-07
+var WellKnown = []string{
+	"oauth-authorization-server",
+	"openid-configuration",
+}
 
 // AuthServerMetadata per
 // https://datatracker.ietf.org/doc/html/draft-ietf-oauth-discovery-07. Fields
@@ -139,8 +138,8 @@ func (m *IssuerKeyFetcher) AddIssuer(ctx context.Context, issuer string) error {
 }
 
 // GetIssuerKeys returns all JSON Web Keys for the given issuer, fetching from
-// the jwks_uri specified in the issuer's OAuth metadata.
-// AddIssuer() must be called first for this issuer.
+// the jwks_uri specified in the issuer's OAuth metadata. AddIssuer() must be
+// called first for this issuer or UntrsutedIssuerError will be returned.
 func (m *IssuerKeyFetcher) GetIssuerKeys(ctx context.Context, issuer string) (jwk.Set, error) {
 	if m.issuers == nil {
 		return nil, UntrustedIssuerError
@@ -153,7 +152,8 @@ func (m *IssuerKeyFetcher) GetIssuerKeys(ctx context.Context, issuer string) (jw
 }
 
 // KeySetFrom returns the key set for the token, based on the token's issuer.
-// The issuer must first be added to the IssuerKeyManager with AddIssuer().
+// The issuer must first be added to the IssuerKeyFetcher with AddIssuer() or
+// UntrustedIssuerError will be returned.
 func (m *IssuerKeyFetcher) KeySetFrom(t jwt.Token) (jwk.Set, error) {
 	return m.GetIssuerKeys(context.Background(), t.Issuer())
 }

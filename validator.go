@@ -63,8 +63,9 @@ func (v groupValidator) Validate(ctx context.Context, t jwt.Token) error {
 // AnyAudiences is the list of special wildcard audiences that a token can
 // present to be used anywhere that otherwise accepts it.
 //
-// * ANY ([SciTokens](https://scitokens.org/technical_docs/Claims.html))
-// * https://wlcg.cern.ch/jwt/v1/any ([WLCG](https://zenodo.org/record/3460258))
+// "ANY" for SciTokens per https://scitokens.org/technical_docs/Claims.html.
+//
+// "https://wlcg.cern.ch/jwt/v1/any" for WLCG tokens per https://zenodo.org/record/3460258.
 var AnyAudiences = []string{
 	"ANY",
 	"https://wlcg.cern.ch/jwt/v1/any",
@@ -75,7 +76,7 @@ type audienceValidator struct {
 }
 
 // WithAudience validates that the token has the given audience or one of the
-// supported "any" audiences.
+// supported "any" audiences, as defined in the AnyAudiences package variable.
 func WithAudience(audience string) Validator {
 	return audienceValidator{audience}
 }
