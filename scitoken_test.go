@@ -101,7 +101,7 @@ var (
 			},
 			Groups:   []string{},
 			Version:  "scitoken:2.0",
-			Audience: []string{"https://transfer-server.example.com"},
+			Audience: []string{"https://cms.example.com"},
 		},
 		{
 			Name:    "WLCG test issuer",
